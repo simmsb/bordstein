@@ -1,0 +1,37 @@
+events.json
+
+# Worktrees
+.worktrees/
+
+# Development files
+node_modules/
+.cache/
+
+# Build files
+build/
+screenshots/
+.lock-*
+__pycache__/
+
+# OS files
+.DS_Store
+.DS_Store?
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+.direnv/
+
+target/
+
+# Devenv
+.devenv*
+devenv.local.nix
+devenv.local.yaml
+
+# direnv
+.direnv
+
+# pre-commit
+.pre-commit-config.yaml
