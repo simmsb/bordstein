@@ -1,22 +1,24 @@
-use core::cell::{Ref, RefCell, RefMut};
+use core::cell::{Ref, RefCell, RefMut, UnsafeCell};
 
 pub struct SingleCoreCell<T> {
-    value: RefCell<T>,
+    value: UnsafeCell<T>,
 }
 
 impl<T> SingleCoreCell<T> {
     pub const fn new(value: T) -> Self {
         Self {
-            value: RefCell::new(value),
+            value: UnsafeCell::new(value),
         }
     }
 
-    pub fn get<'a>(&'a self) -> Ref<'a, T> {
-        self.value.borrow()
-    }
+    // pub fn get<'a>(&'a self) -> Ref<'a, T> {
+    //     self.value.get()
+    // }
 
-    pub fn get_mut<'a>(&'a self) -> RefMut<'a, T> {
-        self.value.borrow_mut()
+    pub fn with_mut<'a>(&'a self, cb: impl FnOnce(&'a mut T)) {
+        unsafe {
+            cb(self.value.get().as_mut_unchecked())
+        }
     }
 }
 

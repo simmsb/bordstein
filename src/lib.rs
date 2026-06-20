@@ -18,8 +18,8 @@ pub mod bindings {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn main() {
-    log_impl::init();
-    // crate::info!("Main called!");
+    // log_impl::init();
+    crate::info!("Main called!");
     executor::init();
     executor::run(init);
 }
@@ -32,7 +32,7 @@ async fn async_main() {
 }
 
 fn init(s: embassy_executor::Spawner) {
-    // crate::info!("Init called!");
+    crate::info!("Init called!");
 
     s.spawn(async_main().unwrap());
 }
@@ -45,8 +45,14 @@ extern "C" fn trigger_panic() -> ! {
         bindings::exit_reason_set(bindings::AppExitReason::APP_EXIT_NOT_SPECIFIED);
         bindings::window_stack_pop_all(false);
 
-        bindings::app_event_loop();
+        // bindings::app_event_loop();
     };
+
+    unsafe {
+        let crash: *mut u32 = core::ptr::null_mut();
+        core::ptr::write_volatile(crash, 0xDEADBEEF);
+    }
+
     loop {}
 }
 

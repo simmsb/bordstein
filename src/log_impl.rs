@@ -32,37 +32,40 @@ static LOG_BUFFERS: SingleCoreCell<Option<LogBuffers>> = SingleCoreCell::new(Non
 pub fn log_at(level: AppLogLevel, file: &str, line: u32, args: fmt::Arguments<'_>) {
     #[cfg(feature = "logging")]
     {
-        let mut buffers_ref = LOG_BUFFERS.get_mut();
-        let Some(LogBuffers { path, buf }) = buffers_ref.as_mut() else {
-            return;
-        };
+        LOG_BUFFERS.with_mut(|b| {
+            let Some(LogBuffers { path, buf }) = b else {
+                return;
+            };
 
-        *path = heapless::CString::new();
-        *buf = heapless::CString::new();
+            *path = heapless::CString::new();
+            *buf = heapless::CString::new();
 
-        let mut writer = CStringWriter { buf };
-        let _ = writer.write_fmt(args);
+            let mut writer = CStringWriter { buf };
+            let _ = writer.write_fmt(args);
 
-        let mut path_writer = CStringWriter { buf: path };
-        let _ = write!(path_writer, "{}", file);
+            let mut path_writer = CStringWriter { buf: path };
+            let _ = write!(path_writer, "{}", file);
 
-        unsafe {
-            crate::bindings::app_log(
-                level as u8,
-                path.as_ptr().cast(),
-                line as i32,
-                buf.as_ptr().cast(),
-            );
-        }
+            unsafe {
+                crate::bindings::app_log(
+                    level as u8,
+                    path.as_ptr().cast(),
+                    line as i32,
+                    buf.as_ptr().cast(),
+                );
+            }
+        });
     }
 }
 
 pub fn init() {
     #[cfg(feature = "logging")]
     {
-        *LOG_BUFFERS.get_mut() = Some(LogBuffers {
-            path: heapless::CString::new(),
-            buf: heapless::CString::new(),
+        LOG_BUFFERS.with_mut(|b| {
+            *b = Some(LogBuffers {
+                path: heapless::CString::new(),
+                buf: heapless::CString::new(),
+            })
         });
     }
 }

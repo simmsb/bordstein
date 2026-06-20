@@ -74,13 +74,13 @@ impl TmrDriver {
     }
 
     fn trigger_alarm(&self) {
-        let mut queue = self.queue.get_mut();
+        self.queue.with_mut(|q| {
+            let mut when = q.next_expiration(self.now());
 
-        let mut when = queue.next_expiration(self.now());
-
-        while !self.set_alarm(when) {
-            when = queue.next_expiration(self.now());
-        }
+            while !self.set_alarm(when) {
+                when = q.next_expiration(self.now());
+            }
+        });
     }
 }
 
@@ -100,14 +100,14 @@ impl Driver for TmrDriver {
     }
 
     fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
-        let mut queue = self.queue.get_mut();
+        self.queue.with_mut(|q| {
+            if q.schedule_wake(at, waker) {
+                let mut when = q.next_expiration(self.now());
 
-        if queue.schedule_wake(at, waker) {
-            let mut when = queue.next_expiration(self.now());
-
-            while !self.set_alarm(when) {
-                when = queue.next_expiration(self.now());
+                while !self.set_alarm(when) {
+                    when = q.next_expiration(self.now());
+                }
             }
-        }
+        });
     }
 }

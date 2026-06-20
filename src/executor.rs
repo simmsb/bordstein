@@ -46,15 +46,16 @@ impl Executor {
 }
 
 pub fn init() {
-    *EXECUTOR.get_mut() = Some(Executor::new());
+    EXECUTOR.with_mut(|e| *e = Some(Executor::new()));
 }
 
 pub fn run(init: impl FnOnce(Spawner)) {
     unsafe {
         {
-            let mut r = EXECUTOR.get_mut();
-            let s = make_static(r.as_mut().unwrap());
-            init(s.spawner());
+            EXECUTOR.with_mut(|e| {
+                let s = make_static(e.as_mut().unwrap());
+                init(s.spawner());
+            });
         }
 
         Executor::run();
@@ -67,7 +68,9 @@ unsafe fn make_static<T>(t: &mut T) -> &'static mut T {
 
 pub unsafe fn poll_executor() {
     unsafe {
-        let mut r = EXECUTOR.get_mut();
-        make_static(r.as_mut().unwrap()).poll();
+        EXECUTOR.with_mut(|e| {
+            let s = make_static(e.as_mut().unwrap());
+            make_static(s).poll();
+        });
     }
 }
