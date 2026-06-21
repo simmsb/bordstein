@@ -1,12 +1,12 @@
+use bindgen::{EnumVariation, callbacks::ParseCallbacks};
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
-use bindgen::{EnumVariation, callbacks::ParseCallbacks};
 
 fn get_pebble_include_path(platform: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let output = Command::new("pebble")
         .args(["sdk", "include-path", platform])
-        .output()?; 
+        .output()?;
 
     if !output.status.success() {
         let error_msg = String::from_utf8_lossy(&output.stderr);
@@ -79,7 +79,11 @@ struct ProcessComments;
 
 impl ParseCallbacks for ProcessComments {
     fn process_comment(&self, comment: &str) -> Option<String> {
-        let comment = comment.lines().map(|l| l.trim_start().trim_start_matches('!')).collect::<Vec<_>>().join("\n");
+        let comment = comment
+            .lines()
+            .map(|l| l.trim_start().trim_start_matches('!'))
+            .collect::<Vec<_>>()
+            .join("\n");
         match doxygen_bindgen::transform(&comment) {
             Ok(res) => Some(res),
             Err(err) => {
@@ -97,7 +101,6 @@ fn main() {
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("none") {
         return;
     }
-
 
     let mut clang_args = pebble_include_args();
     let mut wrapper = "#include <pebble.h>";
@@ -132,7 +135,9 @@ fn main() {
         .clang_arg("-fparse-all-comments")
         .clang_arg("-fretain-comments-from-system-headers")
         .generate_comments(true)
-        .default_enum_style(EnumVariation::Rust { non_exhaustive: false })
+        .default_enum_style(EnumVariation::Rust {
+            non_exhaustive: false,
+        })
         .prepend_enum_name(false)
         .generate()
         .expect("Unable to generate bindings");

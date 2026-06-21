@@ -1,11 +1,19 @@
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::{
+    ptr::NonNull,
+    sync::atomic::{AtomicBool, Ordering},
+    task::Waker,
+};
 
-use embassy_executor::{Spawner, raw};
+use embassy_executor::{
+    Spawner,
+    raw::{self, TaskRef, task_from_waker, wake_task},
+};
 
 use crate::single_core_cell::SingleCoreCell;
 
 static EXECUTOR: SingleCoreCell<Option<Executor>> = SingleCoreCell::new(None);
 static SIGNAL_WORK_THREAD_MODE: AtomicBool = AtomicBool::new(false);
+static EXECUTOR_IN_POLL: AtomicBool = AtomicBool::new(false);
 
 #[unsafe(export_name = "__pender")]
 fn __pender(_context: *mut ()) {
@@ -28,13 +36,19 @@ impl Executor {
     }
 
     unsafe fn poll(&'static mut self) {
+        if EXECUTOR_IN_POLL.swap(true, Ordering::SeqCst) {
+            panic!("Executor polled recursively");
+        }
+
         loop {
             unsafe { self.inner.poll() };
 
             if !SIGNAL_WORK_THREAD_MODE.swap(false, Ordering::SeqCst) {
-                continue;
+                break;
             }
         }
+
+        EXECUTOR_IN_POLL.store(false, Ordering::SeqCst);
     }
 
     pub fn run() {
@@ -73,12 +87,35 @@ unsafe fn make_static<T>(t: &mut T) -> &'static mut T {
 // unsafe, caller must ensure that this is not called re-entrantly
 #[inline(never)]
 pub unsafe fn poll_executor() {
-    unsafe {
-        EXECUTOR.with_mut(|e| {
-            crate::trace!("Executor poll, addr: {:?}", e as *mut _);
-            let Some(e) = e.as_mut() else { return };
-            let s: &mut Executor = make_static(e);
-            make_static(s).poll();
-        });
+    if EXECUTOR_IN_POLL.load(Ordering::SeqCst) {
+        SIGNAL_WORK_THREAD_MODE.store(true, Ordering::SeqCst);
+    } else {
+        unsafe {
+            EXECUTOR.with_mut(|e| {
+                crate::trace!("Executor poll, addr: {:?}", e as *mut _);
+                let Some(e) = e.as_mut() else { return };
+                let s: &mut Executor = make_static(e);
+                make_static(s).poll();
+            });
+        }
     }
+}
+
+pub fn waker_as_ptr(waker: &Waker) -> NonNull<core::ffi::c_void> {
+    // TaskRef doesn't expose as_ptr/from_ptr publicly, so we have to be evil.
+    //
+    // This is certainly a bomb waiting to go off, TaskRef isn't even
+    // #[repr(transparent)]
+    let task_ref = task_from_waker(waker);
+
+    unsafe { core::mem::transmute(task_ref) }
+}
+
+pub fn wake_from_ptr(ptr: NonNull<core::ffi::c_void>) {
+    // TaskRef doesn't expose as_ptr/from_ptr publicly, so we have to be evil.
+    //
+    // This is certainly a bomb waiting to go off, TaskRef isn't even
+    // #[repr(transparent)]
+    let task_ref: TaskRef = unsafe { core::mem::transmute(ptr) };
+    wake_task(task_ref);
 }

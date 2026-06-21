@@ -5,7 +5,10 @@ use core::{
     task::{Poll, Waker},
 };
 
-use crate::bindings::WindowHandlers;
+use crate::{
+    bindings::WindowHandlers,
+    executor::{wake_from_ptr, waker_as_ptr},
+};
 
 pub struct WindowHandle<'active> {
     inner: NonNull<crate::bindings::Window>,
@@ -13,16 +16,21 @@ pub struct WindowHandle<'active> {
 }
 
 unsafe extern "C" fn window_handler_wake(window: *mut crate::bindings::Window) {
-    let waker = unsafe { crate::bindings::window_get_user_data(window).cast::<Waker>() };
-    if let Some(waker) = unsafe { waker.as_ref() } {
-        waker.wake_by_ref();
+    let ptr = unsafe { crate::bindings::window_get_user_data(window) };
+    crate::debug!("About to wake waker: {:?}", ptr);
+    if let Some(waker) = NonNull::new(ptr) {
+        wake_from_ptr(waker);
     }
 
-    unsafe { crate::executor::poll_executor(); }
+    unsafe {
+        crate::executor::poll_executor();
+    }
 }
 
 unsafe extern "C" fn window_handler_noop(_window: *mut crate::bindings::Window) {
-    unsafe { crate::executor::poll_executor(); }
+    unsafe {
+        crate::executor::poll_executor();
+    }
 }
 
 pub async fn with_window(f: impl for<'active> AsyncFnOnce(WindowHandle<'active>)) -> Option<()> {
@@ -40,7 +48,7 @@ pub async fn with_window(f: impl for<'active> AsyncFnOnce(WindowHandle<'active>)
     // wait for window to start
     poll_fn(|cx| unsafe {
         if !has_started {
-            crate::bindings::window_set_user_data(p.as_ptr(), cx.waker() as *const _ as *mut _);
+            crate::bindings::window_set_user_data(p.as_ptr(), waker_as_ptr(cx.waker()).as_ptr());
 
             crate::bindings::window_set_window_handlers(
                 p.as_ptr(),
@@ -68,7 +76,7 @@ pub async fn with_window(f: impl for<'active> AsyncFnOnce(WindowHandle<'active>)
     let mut has_started: bool = false;
     let wait_for_stop = poll_fn(|cx| unsafe {
         if !has_started {
-            crate::bindings::window_set_user_data(p.as_ptr(), cx.waker() as *const _ as *mut _);
+            crate::bindings::window_set_user_data(p.as_ptr(), waker_as_ptr(cx.waker()).as_ptr());
 
             crate::bindings::window_set_window_handlers(
                 p.as_ptr(),
@@ -97,6 +105,10 @@ pub async fn with_window(f: impl for<'active> AsyncFnOnce(WindowHandle<'active>)
         }
     })
     .await;
+
+    unsafe {
+        crate::bindings::window_destroy(p.as_ptr());
+    }
 
     crate::debug!("With window destroy");
 
