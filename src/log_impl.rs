@@ -26,10 +26,27 @@
 //     buf: heapless::CString<128, u8>,
 // }
 
-// #[cfg(feature = "logging")]
-// static LOG_BUFFERS: SingleCoreCell<Option<LogBuffers>> = SingleCoreCell::new(None);
+#[cfg(feature = "logging")]
+use core::mem::MaybeUninit;
 
-// pub fn log_at(level: AppLogLevel, file: &str, line: u32, ) {
+#[cfg(feature = "logging")]
+use crate::single_core_cell::SingleCoreCell;
+
+#[cfg(feature = "logging")]
+static LOG_BUFFER: SingleCoreCell<MaybeUninit<heapless::CString<128>>> =
+    SingleCoreCell::new(MaybeUninit::uninit());
+
+#[doc(hidden)]
+pub fn _with_log_buf(f: impl FnOnce(&mut heapless::CString<128>)) {
+    unsafe {
+        LOG_BUFFER.with_mut(|mbuf| {
+            let buf = mbuf.write(heapless::CString::new());
+            f(buf);
+        });
+    }
+}
+
+// pub fn log_at(level: AppLogLevel, file: &CStr, line: u32, ) {
 //     #[cfg(feature = "logging")]
 //     {
 //         let mut path = heapless::CString::<32>::new();
@@ -57,17 +74,18 @@ macro_rules! log {
     ($level:expr, $file:expr, $line:expr, $($arg:tt)*) => {
         #[cfg(feature = "logging")]
         {
-            let mut buf = heapless::CString::<64>::new();
-            let _ = ::ufmt::uwrite!(&mut buf, $($arg)*);
-            #[allow(unused_unsafe)]
-            unsafe {
-                $crate::bindings::app_log(
-                    $level as u8,
-                    $file,
-                    $line,
-                    buf.as_c_str().as_ptr(),
-                );
-            }
+            crate::log_impl::_with_log_buf(|buf| {
+                let _ = ::ufmt::uwrite!(buf, $($arg)*);
+                #[allow(unused_unsafe)]
+                unsafe {
+                    $crate::bindings::app_log(
+                        $level as u8,
+                        $file,
+                        $line,
+                        buf.as_c_str().as_ptr(),
+                    );
+                }
+            });
         }
     };
 }

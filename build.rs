@@ -1,4 +1,7 @@
-use bindgen::{EnumVariation, callbacks::ParseCallbacks};
+use bindgen::{
+    EnumVariation,
+    callbacks::{ParseCallbacks, TypeKind},
+};
 use std::env;
 use std::path::PathBuf;
 use std::process::Command;
@@ -94,6 +97,43 @@ impl ParseCallbacks for ProcessComments {
     }
 }
 
+#[derive(Debug)]
+struct AddDerives;
+
+impl ParseCallbacks for AddDerives {
+    fn add_derives(&self, info: &bindgen::callbacks::DeriveInfo<'_>) -> Vec<String> {
+        if info.kind == TypeKind::Union {
+            return vec![];
+        }
+
+        if info.name.starts_with('_')
+            || info.name.contains("bindgen")
+            || info.name.contains("Handlers")
+            || info.name.contains("Callbacks")
+            || info.name.contains("AnimationImplementation")
+        {
+            return vec![];
+        }
+
+        match info.name {
+            "ActionMenuConfig"
+            | "MenuLayerCallbacks"
+            | "TouchEvent"
+            | "HealthMinuteData"
+            | "max_align_t"
+            | "Tuple"
+            | "Tuplet"
+            | "AppSync"
+            | "PropertyAnimationAccessors"
+            | "ContentIndicatorConfig"
+            | "SimpleMenuItem" => return vec![],
+            _ => {}
+        }
+
+        vec!["::ufmt::derive::uDebug".to_owned()]
+    }
+}
+
 fn main() {
     println!("cargo:rerun-if-env-changed=PEBBLE_INCLUDE_DIRS");
     println!("cargo:rerun-if-env-changed=PEBBLE_CFLAGS");
@@ -128,6 +168,7 @@ fn main() {
         .enable_function_attribute_detection()
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .parse_callbacks(Box::new(ProcessComments))
+        .parse_callbacks(Box::new(AddDerives))
         .clang_args(&["-E", "-CC"])
         .clang_arg("--target=arm-none-eabi")
         .clang_arg("-Wno-macro-redefined")

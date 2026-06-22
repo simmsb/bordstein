@@ -1,13 +1,17 @@
 use core::{
+    cell::Cell,
     future::poll_fn,
     marker::PhantomData,
+    mem::ManuallyDrop,
     ptr::NonNull,
     task::{Poll, Waker},
 };
 
+use embassy_executor::raw::TaskRef;
+
 use crate::{
     bindings::{self, GColor, WindowHandlers},
-    executor::{wake_from_ptr, waker_as_ptr},
+    layer::{Layer, LayerRef},
 };
 
 pub struct WindowHandle<'active> {
@@ -22,18 +26,25 @@ impl<'active> WindowHandle<'active> {
         }
     }
 
-    fn root_layer(&mut self) -> () {
-        unsafe {
-            bindings::window_get_root_layer(self.inner.as_ptr());
-        }
+    pub fn root_layer<'layer>(&'layer mut self) -> LayerRef<'layer> {
+        let ptr = unsafe { bindings::window_get_root_layer(self.inner.as_ptr()) };
+
+        LayerRef::from_ptr(NonNull::new(ptr).unwrap())
     }
 }
 
+struct WindowInfo {
+    waker: TaskRef,
+    done: Cell<bool>,
+}
+
 unsafe extern "C" fn window_handler_wake(window: *mut bindings::Window) {
-    let ptr = unsafe { bindings::window_get_user_data(window) };
-    crate::debug!("About to wake waker: {:?}", ptr);
-    if let Some(waker) = NonNull::new(ptr) {
-        wake_from_ptr(waker);
+    let ptr = unsafe { bindings::window_get_user_data(window).cast::<WindowInfo>() };
+    if let Some(window_info) = NonNull::new(ptr) {
+        unsafe {
+            window_info.as_ref().done.set(true);
+            embassy_executor::raw::wake_task(window_info.as_ref().waker);
+        }
     }
 
     unsafe {
@@ -58,14 +69,26 @@ pub async fn with_window(f: impl for<'active> AsyncFnOnce(WindowHandle<'active>)
         _phantom: PhantomData,
     });
 
+    // probably fine?
+    let task_ref =
+        poll_fn(|cx| Poll::Ready(embassy_executor::raw::task_from_waker(cx.waker()))).await;
+
+    pin_init::stack_pin_init!(let window_info = WindowInfo {
+        waker: task_ref,
+        done: Cell::new(false),
+    });
+
     let mut has_started: bool = false;
 
     crate::debug!("With window start");
 
     // wait for window to start
-    poll_fn(|cx| unsafe {
+    poll_fn(|_cx| unsafe {
         if !has_started {
-            bindings::window_set_user_data(p.as_ptr(), waker_as_ptr(cx.waker()).as_ptr());
+            bindings::window_set_user_data(
+                p.as_ptr(),
+                window_info.as_ref().get_ref() as *const WindowInfo as *mut core::ffi::c_void,
+            );
 
             bindings::window_set_window_handlers(
                 p.as_ptr(),
@@ -82,18 +105,28 @@ pub async fn with_window(f: impl for<'active> AsyncFnOnce(WindowHandle<'active>)
             has_started = true;
 
             Poll::Pending
-        } else {
+        } else if window_info.done.get() {
             Poll::Ready(())
+        } else {
+            Poll::Pending
         }
     })
     .await;
 
     crate::debug!("With window created");
 
+    pin_init::stack_pin_init!(let window_info = WindowInfo {
+        waker: task_ref,
+        done: Cell::new(false),
+    });
+
     let mut has_started: bool = false;
-    let wait_for_stop = poll_fn(|cx| unsafe {
+    let wait_for_stop = poll_fn(|_cx| unsafe {
         if !has_started {
-            bindings::window_set_user_data(p.as_ptr(), waker_as_ptr(cx.waker()).as_ptr());
+            bindings::window_set_user_data(
+                p.as_ptr(),
+                window_info.as_ref().get_ref() as *const WindowInfo as *mut core::ffi::c_void,
+            );
 
             bindings::window_set_window_handlers(
                 p.as_ptr(),
@@ -108,8 +141,10 @@ pub async fn with_window(f: impl for<'active> AsyncFnOnce(WindowHandle<'active>)
             has_started = true;
 
             Poll::Pending
-        } else {
+        } else if window_info.done.get() {
             Poll::Ready(())
+        } else {
+            Poll::Pending
         }
     });
 

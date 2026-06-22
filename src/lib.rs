@@ -3,13 +3,16 @@
 #![feature(integer_widen_truncate)]
 #![feature(impl_trait_in_assoc_type)]
 
+use pin_init::stack_pin_init;
+
+mod colour_impls;
 pub mod executor;
+pub mod graphics_context;
+mod layer;
 pub mod log_impl;
 pub mod single_core_cell;
 pub mod time_driver;
 pub mod window;
-mod colour_impls;
-mod layer;
 
 pub mod bindings {
     #![allow(warnings)]
@@ -38,6 +41,29 @@ async fn async_main() {
     crate::info!("Async main called!");
     window::with_window(async |mut h| {
         h.set_background_colour(bindings::GColor8::RED);
+
+        let window_bounds = h.root_layer().bounds();
+        crate::info!("Window bounds: {:?}", window_bounds);
+
+        let mut foo = 123;
+
+        {
+            stack_pin_init! {
+                let child_layer = h
+                    .root_layer()
+                    .new_child(window_bounds)
+                    .unwrap()
+                    .with_callback(|layer, ctx| {
+                        crate::debug!("Hello from layer callback: {}", foo);
+                        foo += 1;
+                    })
+            };
+
+            embassy_time::Timer::after_secs(1).await;
+
+            crate::info!("Child bounds: {:?}", child_layer.bounds());
+        }
+
         core::future::pending::<()>().await;
     })
     .await

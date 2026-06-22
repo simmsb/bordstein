@@ -101,21 +101,21 @@ pub unsafe fn poll_executor() {
     }
 }
 
-pub fn waker_as_ptr(waker: &Waker) -> NonNull<core::ffi::c_void> {
-    // TaskRef doesn't expose as_ptr/from_ptr publicly, so we have to be evil.
-    //
-    // This is certainly a bomb waiting to go off, TaskRef isn't even
-    // #[repr(transparent)]
-    let task_ref = task_from_waker(waker);
+// pub fn waker_as_ptr(waker: &Waker) -> NonNull<core::ffi::c_void> {
+//     // TaskRef doesn't expose as_ptr/from_ptr publicly, so we have to be evil.
+//     //
+//     // This is certainly a bomb waiting to go off, TaskRef isn't even
+//     // #[repr(transparent)]
+//     let task_ref = task_from_waker(waker);
 
-    unsafe { core::mem::transmute(task_ref) }
-}
+//     unsafe { core::mem::transmute(task_ref) }
+// }
 
-pub fn wake_from_ptr(ptr: NonNull<core::ffi::c_void>) {
-    // TaskRef doesn't expose as_ptr/from_ptr publicly, so we have to be evil.
-    //
-    // This is certainly a bomb waiting to go off, TaskRef isn't even
-    // #[repr(transparent)]
-    let task_ref: TaskRef = unsafe { core::mem::transmute(ptr) };
-    wake_task(task_ref);
-}
+// pub fn wake_from_ptr(ptr: NonNull<core::ffi::c_void>) {
+//     // TaskRef doesn't expose as_ptr/from_ptr publicly, so we have to be evil.
+//     //
+//     // This is certainly a bomb waiting to go off, TaskRef isn't even
+//     // #[repr(transparent)]
+//     let task_ref: TaskRef = unsafe { core::mem::transmute(ptr) };
+//     wake_task(task_ref);
+// }

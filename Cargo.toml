@@ -53,8 +53,12 @@ embassy-futures = "0.1.2"
 heapless = { version = "0.9.3", features = ["ufmt"] }
 higher-kinded-types = "0.3.0"
 ufmt = { version = "0.2.0", default-features = false }
+pin-init = { git = "https://github.com/Rust-for-Linux/pin-init", version = "0.3.0", default-features = false }
 
 [patch.crates-io]
+ufmt = { git = "https://github.com/simmsb/ufmt" }
+ufmt-macros = { git = "https://github.com/simmsb/ufmt" }
+ufmt-write = { git = "https://github.com/simmsb/ufmt" }
 embassy-executor = { git = "https://github.com/embassy-rs/embassy" }
 embassy-futures = { git = "https://github.com/embassy-rs/embassy" }
 embassy-sync = { git = "https://github.com/embassy-rs/embassy" }
