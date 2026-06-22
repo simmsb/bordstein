@@ -1,11 +1,10 @@
 use core::{
     marker::{PhantomData, PhantomPinned},
     ops::{Deref, DerefMut},
-    pin::Pin,
     ptr::NonNull,
 };
 
-use pin_init::{PinInit, pin_init, pinned_drop};
+use pin_init::{PinInit, pin_init};
 
 use crate::{
     bindings::{self, GRect, layer_get_data},
@@ -41,13 +40,13 @@ impl<'a> Deref for LayerRef<'a> {
     type Target = Layer<'a>;
 
     fn deref(&self) -> &Self::Target {
-        &*self.inner
+        &self.inner
     }
 }
 
 impl<'a> DerefMut for LayerRef<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.inner
+        &mut self.inner
     }
 }
 

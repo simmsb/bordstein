@@ -6,13 +6,11 @@ use embassy_time_queue_utils::Queue;
 use crate::single_core_cell::SingleCoreCell;
 
 struct TmrDriver {
-    period: AtomicU32,
     timer_handle: AtomicPtr<crate::bindings::AppTimer>,
     queue: SingleCoreCell<Queue>,
 }
 
 embassy_time_driver::time_driver_impl!(static DRIVER: TmrDriver = TmrDriver {
-    period: AtomicU32::new(0),
     timer_handle: AtomicPtr::new(core::ptr::null_mut()),
     queue: SingleCoreCell::new(Queue::new()),
 });
@@ -34,23 +32,14 @@ impl TmrDriver {
         let now = self.now();
         let timeout_ms = when.saturating_sub(now).saturating_truncate::<u32>();
 
-        if self.timer_handle.load(Ordering::SeqCst).is_null() {
-            unsafe {
-                self.timer_handle.store(
-                    crate::bindings::app_timer_register(
-                        timeout_ms,
-                        Some(timer_callback),
-                        core::ptr::null_mut(),
-                    ),
-                    Ordering::SeqCst,
-                );
+        if self.timer_handle.load(Ordering::SeqCst).is_null()
+            || unsafe {
+                !crate::bindings::app_timer_reschedule(
+                    self.timer_handle.load(Ordering::SeqCst),
+                    timeout_ms,
+                )
             }
-        } else if unsafe {
-            !crate::bindings::app_timer_reschedule(
-                self.timer_handle.load(Ordering::SeqCst),
-                timeout_ms,
-            )
-        } {
+        {
             unsafe {
                 self.timer_handle.store(
                     crate::bindings::app_timer_register(
@@ -62,7 +51,6 @@ impl TmrDriver {
                 );
             }
         }
-
         if when <= self.now() {
             unsafe {
                 crate::bindings::app_timer_cancel(

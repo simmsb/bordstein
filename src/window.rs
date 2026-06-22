@@ -2,16 +2,15 @@ use core::{
     cell::Cell,
     future::poll_fn,
     marker::PhantomData,
-    mem::ManuallyDrop,
     ptr::NonNull,
-    task::{Poll, Waker},
+    task::Poll,
 };
 
 use embassy_executor::raw::TaskRef;
 
 use crate::{
     bindings::{self, GColor, WindowHandlers},
-    layer::{Layer, LayerRef},
+    layer::LayerRef,
 };
 
 pub struct WindowHandle<'active> {

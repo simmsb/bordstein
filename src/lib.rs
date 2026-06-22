@@ -53,7 +53,7 @@ async fn async_main() {
                     .root_layer()
                     .new_child(window_bounds)
                     .unwrap()
-                    .with_callback(|layer, ctx| {
+                    .with_callback(|_layer, _ctx| {
                         crate::debug!("Hello from layer callback: {}", foo);
                         foo += 1;
                     })

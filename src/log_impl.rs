@@ -74,7 +74,7 @@ macro_rules! log {
     ($level:expr, $file:expr, $line:expr, $($arg:tt)*) => {
         #[cfg(feature = "logging")]
         {
-            crate::log_impl::_with_log_buf(|buf| {
+            $crate::log_impl::_with_log_buf(|buf| {
                 let _ = ::ufmt::uwrite!(buf, $($arg)*);
                 #[allow(unused_unsafe)]
                 unsafe {
@@ -107,7 +107,7 @@ macro_rules! error {
     ($($arg:tt)*) => {
         #[cfg(feature = "logging")]
         $crate::log!(
-            crate::bindings::AppLogLevel::APP_LOG_LEVEL_ERROR,
+            $crate::bindings::AppLogLevel::APP_LOG_LEVEL_ERROR,
             concat!(file!(), "\0").as_ptr() as *const core::ffi::c_char,
             line!() as core::ffi::c_int,
             $($arg)*,
@@ -120,7 +120,7 @@ macro_rules! warn {
     ($($arg:tt)*) => {
         #[cfg(feature = "logging")]
         $crate::log!(
-            crate::bindings::AppLogLevel::APP_LOG_LEVEL_WARNING,
+            $crate::bindings::AppLogLevel::APP_LOG_LEVEL_WARNING,
             concat!(file!(), "\0").as_ptr() as *const core::ffi::c_char,
             line!() as core::ffi::c_int,
             $($arg)*,
@@ -133,7 +133,7 @@ macro_rules! info {
     ($($arg:tt)*) => {
         #[cfg(feature = "logging")]
         $crate::log!(
-            crate::bindings::AppLogLevel::APP_LOG_LEVEL_INFO,
+            $crate::bindings::AppLogLevel::APP_LOG_LEVEL_INFO,
             concat!(file!(), "\0").as_ptr() as *const core::ffi::c_char,
             line!() as core::ffi::c_int,
             $($arg)*,
@@ -146,7 +146,7 @@ macro_rules! debug {
     ($($arg:tt)*) => {
         #[cfg(feature = "logging")]
         $crate::log!(
-            crate::bindings::AppLogLevel::APP_LOG_LEVEL_DEBUG,
+            $crate::bindings::AppLogLevel::APP_LOG_LEVEL_DEBUG,
             concat!(file!(), "\0").as_ptr() as *const core::ffi::c_char,
             line!() as core::ffi::c_int,
             $($arg)*,
@@ -159,7 +159,7 @@ macro_rules! trace {
     ($($arg:tt)*) => {
         #[cfg(feature = "logging")]
         $crate::log!(
-            crate::bindings::AppLogLevel::APP_LOG_LEVEL_DEBUG_VERBOSE,
+            $crate::bindings::AppLogLevel::APP_LOG_LEVEL_DEBUG_VERBOSE,
             concat!(file!(), "\0").as_ptr() as *const core::ffi::c_char,
             line!() as core::ffi::c_int,
             $($arg)*,

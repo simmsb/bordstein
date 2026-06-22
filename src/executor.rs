@@ -1,13 +1,6 @@
-use core::{
-    ptr::NonNull,
-    sync::atomic::{AtomicBool, Ordering},
-    task::Waker,
-};
+use core::sync::atomic::{AtomicBool, Ordering};
 
-use embassy_executor::{
-    Spawner,
-    raw::{self, TaskRef, task_from_waker, wake_task},
-};
+use embassy_executor::Spawner;
 
 use crate::single_core_cell::SingleCoreCell;
 
@@ -22,6 +15,12 @@ fn __pender(_context: *mut ()) {
 
 pub struct Executor {
     inner: embassy_executor::raw::Executor,
+}
+
+impl Default for Executor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Executor {

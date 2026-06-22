@@ -1,4 +1,4 @@
-use core::cell::{Ref, RefCell, RefMut, UnsafeCell};
+use core::cell::UnsafeCell;
 
 pub struct SingleCoreCell<T> {
     value: UnsafeCell<T>,
