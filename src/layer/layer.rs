@@ -19,7 +19,7 @@ pub(crate) unsafe extern "C" fn layer_callback(
 
     let context = GContext::new(NonNull::new(context).unwrap());
 
-    let cb: *mut *mut (dyn for<'cb> FnMut(LayerMut<'cb>, GContext<'cb>) + 'static) = unsafe {
+    let cb: *mut *mut dyn LayerUpdateProc<'static> = unsafe {
         bindings::layer_get_data(layer.inner.inner.as_ptr()) as *mut LayerUpdateProcVTable
     };
 
@@ -113,8 +113,9 @@ impl<'layer, F> DerefMut for LayerWithUpdateProc<'layer, F> {
     }
 }
 
+pub trait LayerUpdateProc<'env> = for<'cb> FnMut(LayerMut<'cb>, GContext<'cb>) + 'env;
 pub(crate) type LayerUpdateProcVTable =
-    *mut (dyn for<'cb> FnMut(LayerMut<'cb>, GContext<'cb>) + 'static);
+    *mut dyn LayerUpdateProc<'static>;
 
 impl<'layer> Layer<'layer> {
     pub(crate) fn new(frame: GRect) -> Option<Self> {
@@ -169,14 +170,15 @@ impl<'layer> Layer<'layer> {
 
     /// Attach an update proc to this layer.
     ///
-    /// This returns a [PinInit] as we need
-    /// to pass the pebble SDK a pointer to
-    /// the closure passed in, if
-    /// [LayerWithUpdateProc] could move, it
-    /// would invalidate this reference.
+    /// This returns a [PinInit] as we need to pass the pebble SDK a pointer to
+    /// the closure passed in, if [LayerWithUpdateProc] could move, it would
+    /// invalidate this reference.
+    ///
+    /// Use [pin_init::stack_pin_init] to allocate the result of this method in
+    /// your stack frame.
     pub fn with_update_proc<F>(self, callback: F) -> impl PinInit<LayerWithUpdateProc<'layer, F>>
     where
-        F: for<'cb> FnMut(LayerMut<'cb>, GContext<'cb>) + 'layer,
+        F: LayerUpdateProc<'layer>,
     {
         pin_init!(LayerWithUpdateProc {
             inner: self,
@@ -188,7 +190,7 @@ impl<'layer> Layer<'layer> {
                 let project = p.project();
 
                 let callback_vtable = project.callback
-                    as *mut (dyn for<'cb> FnMut(LayerMut<'cb>, GContext<'cb>) + 'layer);
+                    as *mut dyn LayerUpdateProc<'layer>;
 
                 // N.B. this erases the lifetimes of the closure captures
                 let callback_vtable_static =

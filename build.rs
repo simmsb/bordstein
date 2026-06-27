@@ -150,6 +150,7 @@ fn main() {
                    #include <pebble.h>";
         let emulator = env::var("PEBBLE_EMULATOR").unwrap();
         let pebble_include_path = get_pebble_include_path(&emulator).unwrap();
+        println!("cargo:rerun-if-changed={}", pebble_include_path.display());
         clang_args.push(format!("-isystem{}", pebble_include_path.display()));
         clang_args.push("-Ibuild/include/".to_string());
         clang_args.push(format!("-Ibuild/{emulator}"));

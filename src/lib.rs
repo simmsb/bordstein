@@ -2,6 +2,7 @@
 #![feature(integer_casts)]
 #![feature(integer_widen_truncate)]
 #![feature(impl_trait_in_assoc_type)]
+#![feature(trait_alias)]
 
 use heapless::CString;
 use pin_init::stack_pin_init;
@@ -11,7 +12,9 @@ use self::{
     layer::{Layer, StatusBarLayer, TextLayer},
 };
 
+pub mod app_message;
 pub mod colour;
+pub mod dictionary;
 pub mod executor;
 pub mod font;
 pub mod graphics_context;
@@ -50,6 +53,16 @@ pub extern "C" fn main() {
 async fn async_main() {
     crate::info!("Async main called!");
     window::with_window(async |mut h| {
+        let app_messages = &mut app_message::AppMessages;
+        stack_pin_init!(let app_messages = app_messages.listen(
+            1024,
+            512,
+            |d| {},
+            |_| {},
+            |_| {},
+            |_, _| {},
+        ));
+
         h.set_background_colour(bindings::GColor8::RED);
 
         let window_bounds = h.root_layer().bounds();
@@ -86,6 +99,12 @@ async fn async_main() {
                 let _guard = text_layer.set_text(&text_content);
 
                 embassy_time::Timer::after_secs(1).await;
+
+                app_messages.send(|d| {
+                    d.u16(10001, 1234)?;
+
+                    Ok(())
+                }).unwrap();
             }
 
             crate::info!("Child bounds: {:?}", child_layer.bounds());

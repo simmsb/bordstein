@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicPtr, AtomicU32, Ordering};
+use core::sync::atomic::{AtomicPtr, Ordering};
 
 use embassy_time_driver::Driver;
 use embassy_time_queue_utils::Queue;
