@@ -29,6 +29,7 @@ pub mod single_core_cell;
 pub mod time_driver;
 pub mod utils;
 pub mod window;
+pub mod time;
 
 pub use layer::IsLayer as _;
 

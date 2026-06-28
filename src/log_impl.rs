@@ -76,12 +76,15 @@ macro_rules! log {
         {
             $crate::log_impl::_with_log_buf(|buf| {
                 let _ = ::ufmt::uwrite!(buf, $($arg)*);
+                let level = $level;
+                let file = $file;
+                let line = $line;
                 #[allow(unused_unsafe)]
                 unsafe {
                     $crate::bindings::app_log(
-                        $level as u8,
-                        $file,
-                        $line,
+                        level as u8,
+                        file,
+                        line,
                         buf.as_c_str().as_ptr(),
                     );
                 }

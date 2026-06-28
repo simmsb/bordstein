@@ -7,6 +7,7 @@ use pin_init::{PinInit, pin_data, pinned_drop};
 use crate::{
     bindings::{self, TimeUnits},
     single_core_cell::SingleCoreCell,
+    time::Datetime,
 };
 
 struct TickServiceEntry {
@@ -34,47 +35,6 @@ unsafe impl Linked<Links<TickServiceEntry>> for TickServiceEntry {
             let links = core::ptr::addr_of_mut!((*target).links);
 
             NonNull::new_unchecked(links)
-        }
-    }
-}
-
-pub struct Datetime {
-    // 0..=59, 0..=60 on a leap second
-    pub secs: u8,
-
-    // 0..=59
-    pub mins: u8,
-
-    // 0..=23
-    pub hours: u8,
-
-    // 1..=31
-    pub day_of_month: u8,
-
-    // 0..=6
-    pub day_of_week: u8,
-
-    // 0..=365
-    pub day_of_year: u16,
-
-    // 0..=11
-    pub month: u8,
-
-    // Years since 1900
-    pub year: u16,
-}
-
-impl Datetime {
-    fn from_tm(tm: &bindings::tm) -> Self {
-        Self {
-            secs: tm.tm_sec as u8,
-            mins: tm.tm_min as u8,
-            hours: tm.tm_hour as u8,
-            day_of_month: tm.tm_mday as u8,
-            day_of_week: tm.tm_wday as u8,
-            day_of_year: tm.tm_yday as u16,
-            month: tm.tm_mon as u8,
-            year: tm.tm_year as u16,
         }
     }
 }
@@ -185,6 +145,18 @@ fn stream_closure(ptr: NonNull<TickServiceStream>) -> TickServiceStreamHandler {
 }
 
 /// Similar to [listen], this returns a [futures::Stream] of [Datetime].
+///
+/// NOTE: You can create multiple tick event listeners from multiple locations,
+/// the library handles this elegantly using an intrusive linked list of
+/// stack-allocated nodes. The tick service is automatically re-registered as
+/// listeners are added and removed.
+///
+/// This returns a [PinInit] as we need to pass the pebble SDK a pointer to the
+/// closure passed in, if [TickServiceStream] could move, it would invalidate
+/// this reference.
+///
+/// Use [pin_init::stack_pin_init] to allocate the result of this method in your
+/// stack frame.
 #[must_use = "Callback is deregistered and dropped when [TickServiceStream] is dropped"]
 pub fn stream(units: TimeUnits) -> impl PinInit<TickServiceStream> {
     pin_init::pin_init!(&this in TickServiceStream {
