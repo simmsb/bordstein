@@ -12,7 +12,7 @@ use pin_init::stack_pin_init;
 
 use self::{
     bindings::{GTextAlignment, TimeUnits},
-    layer::{Layer, StatusBarLayer, TextLayer},
+    layers::{Layer, StatusBarLayer, TextLayer},
 };
 
 pub mod app_message;
@@ -22,7 +22,7 @@ pub mod events;
 pub mod executor;
 pub mod font;
 pub mod graphics_context;
-pub mod layer;
+pub mod layers;
 pub mod log_impl;
 pub mod shapes;
 pub mod single_core_cell;
@@ -31,7 +31,7 @@ pub mod utils;
 pub mod window;
 pub mod time;
 
-pub use layer::IsLayer as _;
+pub use layers::IsLayer as _;
 
 pub mod bindings {
     #![allow(warnings)]
@@ -67,7 +67,7 @@ async fn async_main_() {
         stack_pin_init!(let app_messages = app_messages.listen(
             1024,
             512,
-            |d| {},
+            |_d| {},
             |_| {},
             |_| {},
             |_, _| {},

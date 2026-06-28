@@ -127,7 +127,7 @@ impl<'handle> AccelerometerServiceHandle<'handle> {
         callback: F,
     ) -> impl PinInit<TapServiceSubscription<'subscription, F>>
     where
-        F: for<'samples> FnMut(AccelAxisType, i32) + 'subscription,
+        F: FnMut(AccelAxisType, i32) + 'subscription,
     {
         pin_init::pin_init!{&this in TapServiceSubscription {
             callback,

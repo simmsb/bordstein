@@ -4,7 +4,7 @@ use embassy_executor::raw::TaskRef;
 
 use crate::{
     bindings::{self, GColor, WindowHandlers},
-    layer::LayerRef,
+    layers::LayerRef,
 };
 
 pub struct WindowHandle<'active> {

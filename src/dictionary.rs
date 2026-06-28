@@ -136,7 +136,8 @@ pub struct Tuple<'dictionary> {
     _phantom: PhantomData<&'dictionary ()>,
 }
 
-#[repr(packed)]
+/// Helper type that makes the inner field unaligned.
+#[repr(Rust, packed)]
 struct Unaligned<T>(T);
 
 impl<'dictionary> Tuple<'dictionary> {

@@ -15,7 +15,13 @@ impl<T> SingleCoreCell<T> {
     //     self.value.get()
     // }
 
+    /// Act on this cell in a callback.
+    ///
+    /// # Safety
+    ///
+    /// You must only call this function non-reentrantly, and non-concurrently.
     pub unsafe fn with_mut<'a>(&'a self, cb: impl FnOnce(&'a mut T)) {
+        // SAFETY: Caller assures us that they are not calling this recursively or concurrently
         unsafe { cb(self.value.get().as_mut_unchecked()) }
     }
 }

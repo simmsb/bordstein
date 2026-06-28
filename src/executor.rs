@@ -34,6 +34,11 @@ impl Executor {
         self.inner.spawner()
     }
 
+    /// Poll the executor once
+    ///
+    /// # Safety
+    ///
+    /// This must not be called re-entrantly.
     unsafe fn poll(&'static mut self) {
         if EXECUTOR_IN_POLL.swap(true, Ordering::SeqCst) {
             panic!("Executor polled recursively");
@@ -83,7 +88,16 @@ unsafe fn make_static<T>(t: &mut T) -> &'static mut T {
     unsafe { ::core::mem::transmute(t) }
 }
 
-// unsafe, caller must ensure that this is not called re-entrantly
+/// Poll the executor, or pend the executor, depending on whether we are inside it or not.
+///
+/// This is safe to use from inside pebble SDK callbacks which might be called
+/// by either [crate::bindings::app_event_loop] or directly by a SDK function
+/// called by user code (e.g. window deregister events called on the window
+/// being popped, by [crate::bindings:window_stack_pop])
+///
+/// # Safety
+///
+/// Ensure the exeuctor has been initialised.
 #[inline(never)]
 pub unsafe fn poll_executor() {
     if EXECUTOR_IN_POLL.load(Ordering::SeqCst) {

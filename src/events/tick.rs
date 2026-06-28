@@ -94,7 +94,7 @@ where
 
         unsafe {
             LIST.with_mut(|l| {
-                l.push_front(NonNull::from_mut(&mut project.entry));
+                l.push_front(NonNull::from_mut(project.entry));
 
                 re_register_callback(l);
             });

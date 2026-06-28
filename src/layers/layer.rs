@@ -193,8 +193,10 @@ impl<'layer> Layer<'layer> {
                 let callback_vtable = project.callback as *mut dyn LayerUpdateProc<'layer>;
 
                 // N.B. this erases the lifetimes of the closure captures
-                let callback_vtable_static =
-                    core::mem::transmute::<_, LayerUpdateProcVTable>(callback_vtable);
+                let callback_vtable_static = core::mem::transmute::<
+                    *mut dyn LayerUpdateProc<'layer>,
+                    LayerUpdateProcVTable,
+                >(callback_vtable);
 
                 // Pointer to the fat dyn pointer
                 let cb = bindings::layer_get_data(project.inner.inner.as_ptr())
