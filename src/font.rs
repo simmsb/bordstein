@@ -2,6 +2,7 @@ use core::ffi::CStr;
 
 use crate::{bindings, resources::Resource};
 
+#[derive(Clone)]
 pub struct Font(pub(crate) bindings::GFont);
 
 pub mod system {
@@ -20,10 +21,12 @@ pub mod system {
     };
 }
 
-pub fn get_system_font(key: &CStr) -> Font {
-    Font(unsafe { bindings::fonts_get_system_font(key.as_ptr()) })
-}
+impl Font {
+    pub fn get_system_font(key: &CStr) -> Self {
+        Font(unsafe { bindings::fonts_get_system_font(key.as_ptr()) })
+    }
 
-pub fn load_custom_font(handle: Resource) -> Font {
-    Font(unsafe { bindings::fonts_load_custom_font(handle.0.as_ptr()) })
+    pub fn load_custom_font(handle: Resource) -> Self {
+        Font(unsafe { bindings::fonts_load_custom_font(handle.0.as_ptr()) })
+    }
 }
