@@ -24,9 +24,8 @@ async fn async_main(services: pebble_async::PebbleServices, spawner: embassy_exe
 async fn async_main_(mut services: pebble_async::PebbleServices, spawner: embassy_executor::Spawner) {
     pebble_async::info!("Async main called!");
     window::with_window(async |mut h| {
-        stack_pin_init!(let app_messages = services.app_messages.listen(
-            1024,
-            512,
+        let mut app_messages = services.app_messages.open(1024, 512);
+        stack_pin_init!(let _app_message_listener = app_messages.listen(
             |_d| {},
             |_| {},
             |_| {},
