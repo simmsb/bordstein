@@ -1,16 +1,11 @@
 #![no_std]
-#![feature(integer_casts)]
-#![feature(integer_widen_truncate)]
 #![feature(impl_trait_in_assoc_type)]
-#![feature(trait_alias)]
-#![feature(atomic_ptr_null)]
-#![feature(type_alias_impl_trait)]
 
 use futures::StreamExt as _;
 use heapless::CString;
 use pin_init::stack_pin_init;
 
-use pebble_async::{
+use bordstein::{
     IsLayer as _,
     bindings::{self, GTextAlignment, TimeUnits},
     events,
@@ -18,45 +13,21 @@ use pebble_async::{
     shapes, window,
 };
 
-fn init(s: embassy_executor::Spawner) {
-    let token = match async_main(unsafe { pebble_async::PebbleServices::steal() }, s) {
-        Ok(token) => token,
-        Err(reason) => match reason {
-            embassy_executor::SpawnError::Busy => {
-                panic!("Busy spawn");
-            }
-        },
-    };
-    s.spawn(token);
-}
-#[unsafe(no_mangle)]
-pub extern "C" fn main() {
-    pebble_async::executor::init();
-    pebble_async::executor::run(init);
-}
+bordstein::main!(async_main);
 
 #[embassy_executor::task]
-async fn async_main(services: pebble_async::PebbleServices, spawner: embassy_executor::Spawner) {
+async fn async_main(services: bordstein::PebbleServices, spawner: embassy_executor::Spawner) {
     async_main_(services, spawner).await;
 }
 
 async fn async_main_(
-    mut services: pebble_async::PebbleServices,
-    spawner: embassy_executor::Spawner,
+    mut services: bordstein::PebbleServices,
+    _spawner: embassy_executor::Spawner,
 ) {
-    pebble_async::info!("Async main called!");
-
-    // #[cfg(all(target_has_atomic = "32"))]
-    // pebble_async::info!("Has atomic 32!");
-
-    // #[cfg(not(any(target_has_atomic = "8", target_has_atomic = "32")))]
-    // pebble_async::info!("Has criticl!");
-
-    // #[cfg(all(any(target_has_atomic = "8", target_has_atomic = "32")))]
-    // pebble_async::info!("Has atomic!");
+    bordstein::info!("Async main called!");
 
     window::with_window(async |mut h| {
-        let mut app_messages = services.app_messages.open(1024, 512);
+        let app_messages = services.app_messages.open(1024, 512);
         stack_pin_init!(let _app_message_listener = app_messages.listen(
             |_d| {},
             |_| {},
@@ -75,17 +46,17 @@ async fn async_main_(
         h.set_background_colour(bindings::GColor8::RED);
 
         let window_bounds = h.root_layer().bounds();
-        pebble_async::info!("Window bounds: {:?}", window_bounds);
+        bordstein::info!("Window bounds: {:?}", window_bounds);
 
         stack_pin_init!(let timer_minutes = events::tick::listen(TimeUnits::MINUTE_UNIT, |time, _| {
-            pebble_async::info!("minute timer tick: {:?}", time);
+            bordstein::info!("minute timer tick: {:?}", time);
         }));
 
         let mut foo = 123;
 
         {
             stack_pin_init!(let timer_seconds = events::tick::listen(TimeUnits::SECOND_UNIT, |time, _| {
-                pebble_async::info!("second timer tick: {:?}", time);
+                bordstein::info!("second timer tick: {:?}", time);
             }));
 
             let root_layer = h.root_layer();
@@ -99,7 +70,7 @@ async fn async_main_(
                     .new_child::<Layer>(remaining_space)
                     .unwrap()
                     .with_update_proc(|_layer, _ctx| {
-                        pebble_async::debug!("Hello from layer callback: {}", foo);
+                        bordstein::debug!("Hello from layer callback: {}", foo);
                         foo += 1;
                     })
             };
@@ -109,15 +80,8 @@ async fn async_main_(
             let mut accelerometer_service = services.accelerometer.enable();
             stack_pin_init!(let tap_events = accelerometer_service.subscribe_to_tap_service(|axis, dir| {
                 num_taps += 1;
-                pebble_async::info!("Tap! {}, {:?}, {}", num_taps, axis, dir);
+                bordstein::info!("Tap! {}, {:?}, {}", num_taps, axis, dir);
             }));
-
-            // let mut text_layer_drop_test = child_layer
-            //     .new_child::<TextLayer>(child_layer.bounds())
-            //     .unwrap();
-            // let g = text_layer_drop_test.set_text(c"foo");
-            // drop(text_layer_drop_test);
-            // drop(g);
 
             let mut text_layer: TextLayer<'_> = child_layer
                 .new_child::<TextLayer>(child_layer.bounds())
@@ -141,16 +105,18 @@ async fn async_main_(
                     .unwrap();
             }
 
-            pebble_async::info!("Child bounds: {:?}", child_layer.bounds());
+            bordstein::info!("Child bounds: {:?}", child_layer.bounds());
         }
 
         stack_pin_init!(let timer_seconds_stream = events::tick::stream(TimeUnits::SECOND_UNIT));
         while let Some(t) = timer_seconds_stream.next().await {
-            pebble_async::info!("second tick stream: {}", t.0.secs);
+            bordstein::info!("second tick stream: {}", t.0.secs);
         }
 
         // layers now destroyed, app should show just the window with its red background
 
+        // if you have nothing else to do, but want to wait until the system
+        // closes the window, you can use core::future::pending.
         core::future::pending::<()>().await;
     })
     .await

@@ -1,7 +1,6 @@
 #![no_std]
 #![feature(integer_casts)]
 #![feature(integer_widen_truncate)]
-#![feature(impl_trait_in_assoc_type)]
 #![feature(trait_alias)]
 #![feature(atomic_ptr_null)]
 #![feature(type_alias_impl_trait)]
@@ -106,17 +105,4 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     crate::error!("Panic! {}", msg);
     crate::error!("{}:{}", info.location().map(|l| l.file()).unwrap_or(""), info.location().map(|l| l.line()).unwrap_or(0));
     trigger_panic();
-}
-
-
-struct CriticalSectionImpl;
-critical_section::set_impl!(CriticalSectionImpl);
-
-unsafe impl critical_section::Impl for CriticalSectionImpl {
-    unsafe fn acquire() -> critical_section::RawRestoreState {
-        ()
-    }
-
-    unsafe fn release(_restore_state: critical_section::RawRestoreState) {
-    }
 }

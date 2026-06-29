@@ -1,5 +1,5 @@
 {
-  "name": "pebble-weather-graph-async",
+  "name": "bordstein-example",
   "author": "simmsb",
   "version": "1.0.0",
   "keywords": [
@@ -20,7 +20,7 @@
     "build": "pkts build"
   },
   "pebble": {
-    "displayName": "pebble-weather-graph",
+    "displayName": "bordstein-example",
     "uuid": "97d6043a-2489-4c2c-a9ba-2ca68b57544f",
     "sdkVersion": "3",
     "enableMultiJS": true,

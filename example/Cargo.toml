@@ -4,12 +4,12 @@ cargo-features = ["panic-immediate-abort"]
 crate-type = ["staticlib"]
 
 [package]
-name = "pebble-async-example"
+name = "bordstein-example"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-pebble-async = { path = ".." }
+bordstein = { path = ".." }
 embassy-executor = { version = "0.10.0", default-features = false, features = ["nightly", "embassy-time-driver"] }
 embassy-time-driver = { version = "0.2.2" }
 embassy-time-queue-utils = "0.3.2"

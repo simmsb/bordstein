@@ -38,6 +38,44 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4388bee8683e3d04af747c73422af53102d2bd24d9eadb6cbc100baef4b43f8"
 
 [[package]]
+name = "bordstein"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "cordyceps",
+ "doxygen-bindgen",
+ "doxygen-rs",
+ "embassy-executor",
+ "embassy-futures",
+ "embassy-sync",
+ "embassy-time",
+ "embassy-time-driver",
+ "embassy-time-queue-utils",
+ "futures",
+ "heapless",
+ "pin-init",
+ "ufmt",
+ "ufmt-macros 0.3.0 (git+https://github.com/simmsb/ufmt)",
+]
+
+[[package]]
+name = "bordstein-example"
+version = "0.1.0"
+dependencies = [
+ "bordstein",
+ "embassy-executor",
+ "embassy-futures",
+ "embassy-sync",
+ "embassy-time",
+ "embassy-time-driver",
+ "embassy-time-queue-utils",
+ "futures",
+ "heapless",
+ "pin-init",
+ "ufmt",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -520,45 +558,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
-name = "pebble-async"
-version = "0.1.0"
-dependencies = [
- "bindgen",
- "cordyceps",
- "critical-section",
- "doxygen-bindgen",
- "doxygen-rs",
- "embassy-executor",
- "embassy-futures",
- "embassy-sync",
- "embassy-time",
- "embassy-time-driver",
- "embassy-time-queue-utils",
- "futures",
- "heapless",
- "pin-init",
- "portable-atomic",
- "ufmt",
-]
-
-[[package]]
-name = "pebble-async-example"
-version = "0.1.0"
-dependencies = [
- "embassy-executor",
- "embassy-futures",
- "embassy-sync",
- "embassy-time",
- "embassy-time-driver",
- "embassy-time-queue-utils",
- "futures",
- "heapless",
- "pebble-async",
- "pin-init",
- "ufmt",
-]
-
-[[package]]
 name = "phf"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -625,12 +624,6 @@ name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
-
-[[package]]
-name = "portable-atomic"
-version = "1.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c33a9471896f1c69cecef8d20cbe2f7accd12527ce60845ff44c153bb2a21b49"
 
 [[package]]
 name = "prettyplease"
@@ -877,10 +870,22 @@ dependencies = [
 [[package]]
 name = "ufmt"
 version = "0.2.0"
-source = "git+https://github.com/simmsb/ufmt#f399fd97733edd11fdce46cc5fab7ee278e3688f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a64846ec02b57e9108d6469d98d1648782ad6bb150a95a9baac26900bbeab9d"
 dependencies = [
- "ufmt-macros",
+ "ufmt-macros 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ufmt-write",
+]
+
+[[package]]
+name = "ufmt-macros"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d337d3be617449165cb4633c8dece429afd83f84051024079f97ad32a9663716"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -896,7 +901,8 @@ dependencies = [
 [[package]]
 name = "ufmt-write"
 version = "0.1.0"
-source = "git+https://github.com/simmsb/ufmt#f399fd97733edd11fdce46cc5fab7ee278e3688f"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e87a2ed6b42ec5e28cc3b94c09982969e9227600b2e3dcbc1db927a84c06bd69"
 
 [[package]]
 name = "unicode-ident"

@@ -128,11 +128,12 @@ impl ParseCallbacks for AddDerives {
             | "AppSync"
             | "PropertyAnimationAccessors"
             | "ContentIndicatorConfig"
-            | "SimpleMenuItem" => return vec![],
+            | "SimpleMenuItem"
+            | "sxAPI"  => return vec![],
             _ => {}
         }
 
-        vec!["::ufmt::derive::uDebug".to_owned()]
+        vec!["::ufmt_macros_fork::uDebug".to_owned()]
     }
 }
 

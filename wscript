@@ -7,7 +7,7 @@ top = '.'
 out = 'build'
 
 RUST_TARGETS = {
-    'emery': 'thumbv7m-none-eabi',
+    'emery': 'thumbv7m-single-core',
 }
 
 
@@ -39,7 +39,7 @@ def process_cargo_staticlib(tg):
     tg.target = tg.cargo_libname
 
 
-def _declare_rust_staticlib(ctx, platform, rust_target, libname='pebble_async_example'):
+def _declare_rust_staticlib(ctx, platform, rust_target, libname='bordstein_example'):
     rust_dir = ctx.path.find_node('.')
     target_dir = ctx.bldnode.make_node('target/{}'.format(platform))
     libnode = target_dir.make_node(
@@ -69,9 +69,12 @@ def _declare_rust_staticlib(ctx, platform, rust_target, libname='pebble_async_ex
         cargo_include_dirs=':'.join(include_dirs),
         cargo_cflags=' '.join(ctx.env.CFLAGS),
         # Needed or the built program will be wonky, seems to cause it to not call functions correctly?
-        cargo_rustflags='-C relocation-model=pie -C codegen-units=1 -C link-arg=--gc-sections -C link-arg=--build-id=sha1 -C link-arg=--emit-relocs -C debuginfo=2',
-        cargo_cmd=['cargo', 'build', '--release', '-p', 'pebble-async-example',
-                   '--target', rust_target,
+        cargo_rustflags='-C relocation-model=pic -C codegen-units=1 -C link-arg=--build-id=sha1 -C link-arg=--emit-relocs -C debuginfo=2 ',
+        # The custom build target is needed so that rust assumes a single core and doesn't
+        # generate barrier instructions (which work on the emulator, but fails on hardware)
+        cargo_cmd=['cargo', 'build', '--release', '-p', 'bordstein-example',
+                   '--target', rust_target + '.json',
+                   '-Zjson-target-spec',
                    '--target-dir', target_dir.abspath()],
     )
     return name
