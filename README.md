@@ -2,6 +2,9 @@
 
 <h2 align="center">Rust API bindings for the Pebble SDK which tries its best to be rusty</h2>
 
+> [!WARNING]
+> This library is heavily in development, might not be fully safe, and will
+> probably change often. Use at your own risk.
 
 Bordstein is a Rust library which you can use to write PebbleOS applications in Rust.
 
@@ -25,7 +28,7 @@ I've designed it to try and abstract away all the C-isms of the C API, some exam
    environment. This means you can create a layer and some local variables, and
    update them from a callback, without having to store your layer in a global
    variable resulting in the need for manual lifetime management.
-   
+
 ## Example
 
 A super unuseful example, yet one that I believe gives a bit of a hint as to
