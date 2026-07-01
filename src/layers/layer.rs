@@ -150,7 +150,7 @@ impl<'layer> Layer<'layer> {
         unsafe { bindings::layer_get_frame(self.inner.as_ptr()) }
     }
 
-    pub fn set_frame(&mut self, frame: GRect) {
+    pub fn set_frame(&self, frame: GRect) {
         unsafe {
             bindings::layer_set_frame(self.inner.as_ptr(), frame);
         }
@@ -160,7 +160,7 @@ impl<'layer> Layer<'layer> {
         unsafe { bindings::layer_get_bounds(self.inner.as_ptr()) }
     }
 
-    pub fn set_bounds(&mut self, bounds: GRect) {
+    pub fn set_bounds(&self, bounds: GRect) {
         unsafe {
             bindings::layer_set_bounds(self.inner.as_ptr(), bounds);
         }
