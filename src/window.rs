@@ -24,6 +24,11 @@ impl<'active> WindowHandle<'active> {
 
         LayerRef::from_ptr(NonNull::new(ptr).unwrap())
     }
+
+    // TODO: click event subscriptions.
+    // It should be possible to offer a `WindowHandle::subscribe_to_single_click(button_id) -> impl Stream<Item = Click>` api.
+    //
+    // TODO: window appear/ disappear handlers/ event streams
 }
 
 struct WindowInfo {

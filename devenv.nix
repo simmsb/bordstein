@@ -41,10 +41,10 @@
 
   unsetEnvVars = ["CC" "CC_FOR_BUILD"];
 
-  # languages.rust = {
-  #   enable = true;
-  #   channel = "nightly";
-  #   targets = [ "thumbv7m-none-eabi" ];
-  #   components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" "rust-src" ];
-  # };
+  languages.rust = {
+    enable = true;
+    channel = "nightly";
+    targets = [ "thumbv7m-none-eabi" ];
+    components = [ "rustc" "cargo" "clippy" "rustfmt" "rust-analyzer" "rust-src" ];
+  };
 }

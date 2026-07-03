@@ -13,6 +13,10 @@ use crate::{
     single_core_cell::SingleCoreCell,
 };
 
+/// This struct provides access to app messages. You must use
+/// [AppMessages::open] to be able to register handlers and send messages.
+///
+/// You receive an instance of this from [crate::main].
 pub struct AppMessages {
     listeners: SingleCoreCell<List<AppMessageEntry>>,
 }
@@ -271,6 +275,8 @@ pub(crate) type AppMessageOutboxSentHandlerVTable = dyn AppMessageOutboxSentHand
 
 pub(crate) type AppMessageOutboxFailedHandlerVTable = dyn AppMessageOutboxFailedHandler<'static>;
 
+/// This struct represents that an AppMessage handler is registered.
+/// When dropped, the handler is deregistered.
 #[must_use = "Callbacks are deregistered and dropped when [AppMessageListenerHandle] is dropped."]
 #[pin_data(PinnedDrop)]
 pub struct AppMessageListenerHandle<

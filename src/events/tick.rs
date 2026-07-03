@@ -1,5 +1,3 @@
-///! Tick service subscriptions
-
 use core::{cell::Cell, marker::PhantomPinned, pin::Pin, ptr::NonNull, task::Poll};
 
 use cordyceps::{Linked, List, list::Links};
@@ -45,6 +43,7 @@ pub trait TickServiceHandler<'env> = for<'tm> FnMut(&'tm bindings::tm, bindings:
 
 pub(crate) type TickServiceHandlerVTable = dyn TickServiceHandler<'static>;
 
+/// Represents an active subscription. When this is dropped the callback will be deregistered.
 #[must_use = "Callback is deregistered and dropped when [TickServiceHandle] is dropped"]
 #[pin_data(PinnedDrop)]
 pub struct TickServiceHandle<F> {

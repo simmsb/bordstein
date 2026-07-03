@@ -1,4 +1,3 @@
-///! Health service subscriptions
 use core::{cell::Cell, ffi::c_void, marker::PhantomPinned, pin::Pin, ptr::NonNull, task::Poll};
 
 use cordyceps::{Linked, List, list::Links};
@@ -61,6 +60,7 @@ pub trait HealthServiceHandler<'env> = FnMut(HealthEventType) + 'env;
 
 pub(crate) type HealthServiceHandlerVTable = dyn HealthServiceHandler<'static>;
 
+/// Represents an active subscription. When this is dropped the callback will be deregistered.
 #[must_use = "Callback is deregistered and dropped when [HealthServiceHandle] is dropped"]
 #[pin_data(PinnedDrop)]
 pub struct HealthServiceHandle<F> {

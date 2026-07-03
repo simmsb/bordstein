@@ -1,5 +1,3 @@
-///! Battery service subscriptions
-
 use core::{cell::Cell, marker::PhantomPinned, pin::Pin, ptr::NonNull, task::Poll};
 
 use cordyceps::{Linked, List, list::Links};
@@ -49,6 +47,7 @@ pub trait BatteryServiceHandler<'env> = FnMut(BatteryChargeState) + 'env;
 
 pub(crate) type BatteryServiceHandlerVTable = dyn BatteryServiceHandler<'static>;
 
+/// Represents an active subscription. When this is dropped the callback will be deregistered.
 #[must_use = "Callback is deregistered and dropped when [BatteryServiceHandle] is dropped"]
 #[pin_data(PinnedDrop)]
 pub struct BatteryServiceHandle<F> {

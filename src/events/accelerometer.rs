@@ -1,4 +1,3 @@
-///! Accelerometer service subscriptions
 use core::{
     marker::{PhantomData, PhantomPinned},
     mem::MaybeUninit,
@@ -11,6 +10,7 @@ use pin_init::{PinInit, pin_data, pinned_drop};
 
 use crate::bindings::{self, AccelAxisType, AccelData, AccelRawData};
 
+/// Access to the accelerometer. You must use [AccelerometerService::enable] to start it.
 pub struct AccelerometerService {
     pub(crate) _private: (),
 }
@@ -23,7 +23,7 @@ impl AccelerometerService {
         }
     }
 
-    pub fn enable<'this, 'handle: 'this>(&'this mut self) -> AccelerometerServiceHandle<'handle> {
+    pub fn enable<'handle>(&'handle mut self) -> AccelerometerServiceHandle<'handle> {
         unsafe {
             bindings::accel_data_service_subscribe(1, None);
         }
@@ -66,8 +66,8 @@ impl<'handle> AccelerometerServiceHandle<'handle> {
     /// callback. If you want to react to these events in async code, you might
     /// consider having the callback simply push these onto a queue.
     #[must_use = "Service is unsubscribed and closure dropped when [DataServiceSubscription] is dropped."]
-    pub fn subscribe_to_data_service<'subscription: 'handle, F>(
-        &mut self,
+    pub fn subscribe_to_data_service<'subscription, F>(
+        &'subscription mut self,
         samples_per_update: u32,
         callback: F,
     ) -> impl PinInit<DataServiceSubscription<'subscription, F>>
@@ -94,8 +94,8 @@ impl<'handle> AccelerometerServiceHandle<'handle> {
     }
 
     #[must_use = "Service is unsubscribed and closure dropped when [RawDataServiceSubscription] is dropped."]
-    pub fn subscribe_to_raw_data_service<'subscription: 'handle, F>(
-        &mut self,
+    pub fn subscribe_to_raw_data_service<'subscription, F>(
+        &'subscription mut self,
         samples_per_update: u32,
         callback: F,
     ) -> impl PinInit<RawDataServiceSubscription<'subscription, F>>
@@ -122,8 +122,8 @@ impl<'handle> AccelerometerServiceHandle<'handle> {
     }
 
     #[must_use = "Service is unsubscribed and closure dropped when [TapServiceSubscription] is dropped."]
-    pub fn subscribe_to_tap_service<'subscription: 'handle, F>(
-        &mut self,
+    pub fn subscribe_to_tap_service<'subscription, F>(
+        &'subscription mut self,
         callback: F,
     ) -> impl PinInit<TapServiceSubscription<'subscription, F>>
     where
@@ -175,6 +175,7 @@ static RAW_DATA_SERVICE_SUBSCRIPTION_VTABLE: AtomicPtr<
 static TAP_SERVICE_SUBSCRIPTION_VTABLE: AtomicPtr<*mut TapServiceSubscriptionHandlerVTable> =
     AtomicPtr::null();
 
+/// Represents an active subscription. When this is dropped the callback will be deregistered.
 #[must_use = "Service is unsubscribed and closure dropped when [DataServiceSubscription] is dropped."]
 #[pin_data(PinnedDrop)]
 pub struct DataServiceSubscription<'subscription, F> {
@@ -211,6 +212,7 @@ unsafe extern "C" fn accel_data_service_handler(data: *mut AccelData, num_sample
     }
 }
 
+/// Represents an active subscription. When this is dropped the callback will be deregistered.
 #[must_use = "Service is unsubscribed and closure dropped when [RawDataServiceSubscription] is dropped."]
 #[pin_data(PinnedDrop)]
 pub struct RawDataServiceSubscription<'subscription, F> {
@@ -251,6 +253,7 @@ unsafe extern "C" fn accel_raw_data_service_handler(
     }
 }
 
+/// Represents an active subscription. When this is dropped the callback will be deregistered.
 #[must_use = "Service is unsubscribed and closure dropped when [TapServiceSubscription] is dropped."]
 #[pin_data(PinnedDrop)]
 pub struct TapServiceSubscription<'subscription, F> {

@@ -6,36 +6,80 @@
 #![feature(type_alias_impl_trait)]
 #![feature(int_roundings)]
 
+/// Access to app messages.
 pub mod app_message;
+
+/// Utility methods on colours.
 pub mod colour;
+
+/// Bindings for dictionaries, for both reading and writing.
 pub mod dictionary;
+
+/// Subscribe to PebbleOS events.
 pub mod events;
-pub mod executor;
+
+/// Access to system and user fonts.
 pub mod font;
+
+/// Access to the graphics context and other drawing methods.
 pub mod graphics_context;
+
+/// Create and manage layers.
 pub mod layers;
-pub mod log_impl;
+
+/// Bindings for the resource api.
 pub mod resources;
+
+/// Utility methods for points, sizes, and rectangles.
 pub mod shapes;
-pub mod single_core_cell;
+
+/// Date and time related utilitie.s
 pub mod time;
-pub mod time_driver;
+
 pub mod utils;
+
+/// Create windows.
 pub mod window;
+
+/// Access to the storage api.
 pub mod storage;
+
+#[doc(hidden)]
+pub mod log_impl;
+
+#[doc(hidden)]
+pub mod executor;
+
+mod time_driver;
+mod single_core_cell;
 
 pub use layers::IsLayer;
 
+/// Access to the automatically generated bindings to the pebble SDK.
+///
+/// This is generated from the SDK in use at the time of building, so your
+/// resource and message IDs will also be in here.
+///
+/// NOTE: If you use SDK functions which correspond to services which already
+/// have Rust wrappers, you could break some assumptions made by the library.
 pub mod bindings {
     #![allow(warnings)]
 
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
+/// Module containing the automatically generated app message keys.
+///
+/// They also appear in [bindings], but we generate some rust wrappers here as
+/// bindgen makes them `static mut`.
 pub mod messages {
     include!(concat!(env!("OUT_DIR"), "/messages.rs"));
 }
 
+/// A collection of PebbleOS services that have global configuration, and
+/// therefore need to be configured from a single location.
+///
+/// An instance of this struct will be given to you by the [main] macro.
 pub struct PebbleServices {
     pub accelerometer: events::accelerometer::AccelerometerService,
     pub app_messages: app_message::AppMessages,
@@ -55,6 +99,11 @@ impl PebbleServices {
 
 #[macro_export]
 /// Create the main function, and specify which async function should be called.
+///
+/// The main function should be annotated with #\[embassy_executor::task\] with two parameters:
+///
+/// - [PebbleServices], which your code can use to use app messages and the accelerometer service.
+/// - [embassy_executor::Spawner], which you can use to spawn more async tasks.
 ///
 /// # Example
 ///
