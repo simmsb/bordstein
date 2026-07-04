@@ -88,16 +88,18 @@ pub struct Layer<'layer> {
 /// A layer with an attached update function. This needs to be pinned in order
 /// to have a stable reference to the callback data.
 #[pin_init::pin_data]
-pub struct LayerWithUpdateProc<'layer, F> {
+pub struct LayerWithUpdateProc<'layer, 'env, F> {
     inner: Layer<'layer>,
 
     callback: F,
 
     #[pin]
     _pin_phantom: PhantomPinned,
+
+    _phantom: PhantomData<&'env mut ()>,
 }
 
-impl<'layer, F> Deref for LayerWithUpdateProc<'layer, F> {
+impl<'layer, 'env, F> Deref for LayerWithUpdateProc<'layer, 'env, F> {
     type Target = Layer<'layer>;
 
     fn deref(&self) -> &Self::Target {
@@ -105,7 +107,7 @@ impl<'layer, F> Deref for LayerWithUpdateProc<'layer, F> {
     }
 }
 
-impl<'layer, F> DerefMut for LayerWithUpdateProc<'layer, F> {
+impl<'layer, 'env, F> DerefMut for LayerWithUpdateProc<'layer, 'env, F> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
@@ -174,16 +176,20 @@ impl<'layer> Layer<'layer> {
     ///
     /// Use [pin_init::stack_pin_init] to allocate the result of this method in
     /// your stack frame.
-    pub fn with_update_proc<F>(self, callback: F) -> impl PinInit<LayerWithUpdateProc<'layer, F>>
+    pub fn with_update_proc<'env, F>(
+        self,
+        callback: F,
+    ) -> impl PinInit<LayerWithUpdateProc<'layer, 'env, F>>
     where
-        F: for<'cb> FnMut(LayerMut<'cb>, GContext<'cb>) + 'layer,
+        F: for<'cb> FnMut(LayerMut<'cb>, GContext<'cb>) + 'env,
     {
         pin_init!(LayerWithUpdateProc {
             inner: self,
             callback,
             _pin_phantom: PhantomPinned,
+            _phantom: PhantomData,
         })
-        .pin_chain(|p| {
+        .pin_chain(move |p| {
             unsafe {
                 let project = p.project();
 

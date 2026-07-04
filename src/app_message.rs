@@ -65,9 +65,9 @@ pub struct AppMessagesPointers {
     outbox_failed: NonNull<AppMessageOutboxFailedHandlerVTable>,
 }
 
-pub type EmptyInboxDroppedHandler = impl AppMessageInboxDroppedHandler<'static>;
-pub type EmptyOutboxSentHandler = impl AppMessageOutboxSentHandler<'static>;
-pub type EmptyOutboxFailedHandler = impl AppMessageOutboxFailedHandler<'static>;
+pub type EmptyInboxDroppedHandler<'a> = impl AppMessageInboxDroppedHandler<'a>;
+pub type EmptyOutboxSentHandler<'a> = impl AppMessageOutboxSentHandler<'a>;
+pub type EmptyOutboxFailedHandler<'a> = impl AppMessageOutboxFailedHandler<'a>;
 
 impl<'open> MultiRegistrationService for OpenAppMessages<'open> {
     type CallbackData = AppMessagesPointers;
@@ -173,20 +173,23 @@ impl<'open> OpenAppMessages<'open> {
     ///
     /// Use [pin_init::stack_pin_init] to allocate the result of this method in
     /// your stack frame.
-    pub fn listen<'env, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed>(
-        &self,
+    pub fn listen<'env, 'this, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed>(
+        &'this self,
         inbox_received: FInboxReceived,
         inbox_dropped: FInboxDropped,
         outbox_sent: FOutboxSent,
         outbox_failed: FOutboxFailed,
     ) -> impl PinInit<
         Handle<
-            '_,
+            'this,
             AppMessageListener<'open, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed>,
         >,
     >
     where
-        'env: 'open,
+        // 'open: 'env,
+        // 'this: 'env,
+        // 'open: 'env,
+        // 'this: 'env,
         FInboxReceived: for<'message> FnMut(DictionaryRef<'message>) + 'env,
         FInboxDropped: FnMut(AppMessageResult) + 'env,
         FOutboxSent: for<'message> FnMut(DictionaryRef<'message>) + 'env,
@@ -219,23 +222,22 @@ impl<'open> OpenAppMessages<'open> {
     ///
     /// Use [pin_init::stack_pin_init] to allocate the result of this method in
     /// your stack frame.
-    pub fn listen_received<'env, FInboxReceived>(
-        &self,
+    pub fn listen_received<'this, 'env, FInboxReceived>(
+        &'this self,
         inbox_received: FInboxReceived,
     ) -> impl PinInit<
         Handle<
-            '_,
+            'this,
             AppMessageListener<
                 'open,
                 FInboxReceived,
-                EmptyInboxDroppedHandler,
-                EmptyOutboxSentHandler,
-                EmptyOutboxFailedHandler,
+                EmptyInboxDroppedHandler<'env>,
+                EmptyOutboxSentHandler<'env>,
+                EmptyOutboxFailedHandler<'env>,
             >,
         >,
     >
     where
-        'env: 'open,
         FInboxReceived: for<'message> FnMut(DictionaryRef<'message>) + 'env,
     {
         self.listen(
@@ -248,17 +250,17 @@ impl<'open> OpenAppMessages<'open> {
 }
 
 #[define_opaque(EmptyInboxDroppedHandler)]
-fn empty_inbox_dropped_handler() -> EmptyInboxDroppedHandler {
+fn empty_inbox_dropped_handler<'a>() -> EmptyInboxDroppedHandler<'a> {
     |_| {}
 }
 
 #[define_opaque(EmptyOutboxSentHandler)]
-fn empty_outbox_sent_handler() -> EmptyOutboxSentHandler {
+fn empty_outbox_sent_handler<'a>() -> EmptyOutboxSentHandler<'a> {
     |_| {}
 }
 
 #[define_opaque(EmptyOutboxFailedHandler)]
-fn empty_outbox_failed_handler() -> EmptyOutboxFailedHandler {
+fn empty_outbox_failed_handler<'a>() -> EmptyOutboxFailedHandler<'a> {
     |_, _| {}
 }
 

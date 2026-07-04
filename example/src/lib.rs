@@ -56,6 +56,9 @@ async fn async_main_(mut services: bordstein::PebbleServices, _spawner: embassy_
             |_| {},
             |_, _| {},
         ));
+        stack_pin_init!(let _app_message_listener = app_messages.listen_received(
+            |_d| {},
+        ));
 
         let _ = app_messages.send(|d| d.u8(10001, 123));
 
