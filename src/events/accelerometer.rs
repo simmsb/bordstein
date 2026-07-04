@@ -18,27 +18,25 @@ pub struct AccelerometerService {
 impl AccelerometerService {
     #[doc(hidden)]
     pub unsafe fn steal() -> Self {
-        Self {
-            _private: (),
-        }
+        Self { _private: () }
     }
 
-    pub fn enable<'handle>(&'handle mut self) -> AccelerometerServiceHandle<'handle> {
+    pub fn enable<'handle>(&'handle mut self) -> OpenAccelerometerService<'handle> {
         unsafe {
             bindings::accel_data_service_subscribe(1, None);
         }
 
-        AccelerometerServiceHandle {
+        OpenAccelerometerService {
             _phantom: PhantomData,
         }
     }
 }
 
-pub struct AccelerometerServiceHandle<'handle> {
+pub struct OpenAccelerometerService<'handle> {
     _phantom: PhantomData<&'handle mut ()>,
 }
 
-impl<'handle> AccelerometerServiceHandle<'handle> {
+impl<'handle> OpenAccelerometerService<'handle> {
     // TODO: AccelData is quite large and packed, it might be worth repacking it
     // into a rust struct
     pub fn peek(&mut self) -> bindings::AccelData {
@@ -55,7 +53,7 @@ impl<'handle> AccelerometerServiceHandle<'handle> {
     /// These closures are capable of borrowing references to local variables.
     ///
     /// This returns a [PinInit] as we need to pass the pebble SDK a pointer to
-    /// the stack allocated closures passed in. If [AccelerometerServiceHandle] could
+    /// the stack allocated closures passed in. If [OpenAccelerometerService] could
     /// move, it would invalidate this reference.
     ///
     /// Use [pin_init::stack_pin_init] to allocate the result of this method in
@@ -149,7 +147,7 @@ impl<'handle> AccelerometerServiceHandle<'handle> {
     }
 }
 
-impl<'handle> Drop for AccelerometerServiceHandle<'handle> {
+impl<'handle> Drop for OpenAccelerometerService<'handle> {
     fn drop(&mut self) {
         unsafe {
             bindings::accel_data_service_unsubscribe();

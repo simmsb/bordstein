@@ -209,10 +209,7 @@ impl GPoint {
     }
 
     pub const fn with_size(self, size: GSize) -> GRect {
-        GRect {
-            origin: self,
-            size,
-        }
+        GRect { origin: self, size }
     }
 }
 
@@ -222,9 +219,6 @@ impl GSize {
     }
 
     pub const fn with_origin(self, origin: GPoint) -> GRect {
-        GRect {
-            origin,
-            size: self,
-        }
+        GRect { origin, size: self }
     }
 }

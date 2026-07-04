@@ -1,13 +1,18 @@
 cargo-features = ["panic-immediate-abort"]
 
-[workspace]
-members = [".", "example"]
-resolver = "3"
-
 [package]
 name = "bordstein"
 version = "0.1.0"
 edition = "2024"
+
+[lib]
+doc-scrape-examples = true
+
+[[example]]
+name = "bordstein-example"
+path = "example/src/lib.rs"
+crate-type = ["staticlib"]
+doc-scrape-examples = true
 
 [build-dependencies]
 bindgen = "0.72.1"
@@ -64,3 +69,10 @@ embassy-time = { git = "https://github.com/embassy-rs/embassy" }
 embassy-time-driver = { git = "https://github.com/embassy-rs/embassy" }
 embassy-time-queue-utils = { git = "https://github.com/embassy-rs/embassy" }
 embassy-executor-timer-queue = { git = "https://github.com/embassy-rs/embassy" }
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+features = ["_docs"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(docsrs_dep)'] }

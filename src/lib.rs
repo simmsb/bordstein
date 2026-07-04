@@ -5,6 +5,20 @@
 #![feature(atomic_ptr_null)]
 #![feature(type_alias_impl_trait)]
 #![feature(int_roundings)]
+#![feature(fn_traits)]
+#![feature(unboxed_closures)]
+
+#[doc(hidden)]
+pub mod log_impl;
+
+#[doc(hidden)]
+pub mod executor;
+
+mod single_core_cell;
+mod time_driver;
+
+/// Manage pebble backlight
+pub mod light;
 
 /// Access to app messages.
 pub mod app_message;
@@ -44,16 +58,30 @@ pub mod window;
 /// Access to the storage api.
 pub mod storage;
 
-#[doc(hidden)]
-pub mod log_impl;
+pub mod multi_registration_listener;
+/// Manage vibration motor
+pub mod vibes;
 
-#[doc(hidden)]
-pub mod executor;
-
-mod time_driver;
-mod single_core_cell;
-
-pub use layers::IsLayer;
+pub mod prelude {
+    pub use crate::dictionary::*;
+    pub use crate::events::{
+        accelerometer::AccelerometerService,
+        battery_state::BatteryService,
+        connection::ConnectionService,
+        health::HealthService,
+        tick::TickService,
+        unobstructed_area::UnobstructedAreaService,
+    };
+    pub use crate::font::Font;
+    pub use crate::font::system as system_fonts;
+    pub use crate::graphics_context::GContext;
+    pub use crate::layers::{
+        AsChildLayer, IsLayer, Layer, LayerMut, LayerRef, StatusBarLayer, TextLayer,
+    };
+    pub use crate::resources::Resource;
+    pub use crate::time::{Datetime, Timestamp};
+    pub use crate::window::*;
+}
 
 /// Access to the automatically generated bindings to the pebble SDK.
 ///
@@ -152,6 +180,10 @@ extern "C" fn trigger_panic() -> ! {
 fn panic(info: &core::panic::PanicInfo) -> ! {
     let msg = info.message().as_str().unwrap_or("<no message>");
     crate::error!("Panic! {}", msg);
-    crate::error!("{}:{}", info.location().map(|l| l.file()).unwrap_or(""), info.location().map(|l| l.line()).unwrap_or(0));
+    crate::error!(
+        "{}:{}",
+        info.location().map(|l| l.file()).unwrap_or(""),
+        info.location().map(|l| l.line()).unwrap_or(0)
+    );
     trigger_panic();
 }

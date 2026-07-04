@@ -43,7 +43,7 @@ def _declare_rust_staticlib(ctx, platform, rust_target, libname='bordstein_examp
     rust_dir = ctx.path.find_node('.')
     target_dir = ctx.bldnode.make_node('target/{}'.format(platform))
     libnode = target_dir.make_node(
-        '{}/release/lib{}.a'.format(rust_target, libname))
+        '{}/release/examples/lib{}.a'.format(rust_target, libname))
 
     include_dirs = [
         os.path.join(ctx.env.PEBBLE_SDK_PLATFORM, 'include'),
@@ -72,7 +72,7 @@ def _declare_rust_staticlib(ctx, platform, rust_target, libname='bordstein_examp
         cargo_rustflags='-C relocation-model=pic -C codegen-units=1 -C link-arg=--build-id=sha1 -C link-arg=--emit-relocs -C debuginfo=2 ',
         # The custom build target is needed so that rust assumes a single core and doesn't
         # generate barrier instructions (which work on the emulator, but fails on hardware)
-        cargo_cmd=['cargo', 'build', '--release', '-p', 'bordstein-example',
+        cargo_cmd=['cargo', 'build', '--release', '--example', 'bordstein-example',
                    '--target', rust_target + '.json',
                    '-Zjson-target-spec',
                    '--target-dir', target_dir.abspath()],

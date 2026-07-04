@@ -1,18 +1,14 @@
 #![no_std]
 #![feature(impl_trait_in_assoc_type)]
 
-use embassy_time::Timer;
 use futures::StreamExt as _;
 use heapless::CString;
 use pin_init::stack_pin_init;
 
 use bordstein::{
-    IsLayer as _,
-    bindings::{self, GCornerMask, GRect, GTextAlignment, TimeUnits},
-    colour::GColor,
-    events,
-    layers::{Layer, StatusBarLayer, TextLayer},
-    shapes, window,
+    bindings::{GColor8, GTextAlignment, TimeUnits},
+    prelude::*,
+    shapes,
 };
 
 bordstein::main!(async_main);
@@ -43,13 +39,10 @@ async fn async_main(services: bordstein::PebbleServices, spawner: embassy_execut
     async_main_(services, spawner).await;
 }
 
-async fn async_main_(
-    mut services: bordstein::PebbleServices,
-    _spawner: embassy_executor::Spawner,
-) {
+async fn async_main_(mut services: bordstein::PebbleServices, _spawner: embassy_executor::Spawner) {
     bordstein::info!("Async main called!");
 
-    window::with_window(async |mut h| {
+    with_window(async |mut h| {
         let app_messages = services.app_messages.open(1024, 512);
         stack_pin_init!(let _app_message_listener = app_messages.listen(
             |_d| {},
@@ -66,19 +59,19 @@ async fn async_main_(
 
         let _ = app_messages.send(|d| d.u8(10001, 123));
 
-        h.set_background_colour(bindings::GColor8::RED);
+        h.set_background_colour(GColor8::RED);
 
         let window_bounds = h.root_layer().bounds();
         bordstein::info!("Window bounds: {:?}", window_bounds);
 
-        stack_pin_init!(let timer_minutes = events::tick::listen(TimeUnits::MINUTE_UNIT, |time, _| {
+        stack_pin_init!(let timer_minutes = TickService::listen(TimeUnits::MINUTE_UNIT, |time, _| {
             bordstein::info!("minute timer tick: {:?}", time);
         }));
 
         let mut foo = 123;
 
         {
-            stack_pin_init!(let timer_seconds = events::tick::listen(TimeUnits::SECOND_UNIT, |time, _| {
+            stack_pin_init!(let timer_seconds = TickService::listen(TimeUnits::SECOND_UNIT, |time, _| {
                 bordstein::info!("second timer tick: {:?}", time);
             }));
 
@@ -131,7 +124,7 @@ async fn async_main_(
             bordstein::info!("Child bounds: {:?}", child_layer.bounds());
         }
 
-        stack_pin_init!(let timer_seconds_stream = events::tick::stream(TimeUnits::SECOND_UNIT));
+        stack_pin_init!(let timer_seconds_stream = TickService::stream(TimeUnits::SECOND_UNIT));
         while let Some(t) = timer_seconds_stream.next().await {
             bordstein::info!("second tick stream: {}", t.0.secs);
         }

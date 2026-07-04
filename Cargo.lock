@@ -59,23 +59,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bordstein-example"
-version = "0.1.0"
-dependencies = [
- "bordstein",
- "embassy-executor",
- "embassy-futures",
- "embassy-sync",
- "embassy-time",
- "embassy-time-driver",
- "embassy-time-queue-utils",
- "futures",
- "heapless",
- "pin-init",
- "ufmt",
-]
-
-[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

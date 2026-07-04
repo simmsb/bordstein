@@ -129,7 +129,7 @@ impl ParseCallbacks for AddDerives {
             | "PropertyAnimationAccessors"
             | "ContentIndicatorConfig"
             | "SimpleMenuItem"
-            | "sxAPI"  => return vec![],
+            | "sxAPI" => return vec![],
             _ => {}
         }
 
@@ -170,10 +170,7 @@ fn write_messages_rs(path: &Path, keys: &[String]) -> std::io::Result<()> {
     for name in keys {
         writeln!(file, "#[allow(non_snake_case)]")?;
         writeln!(file, "pub fn {name}() -> u32 {{")?;
-        writeln!(
-            file,
-            "    unsafe {{ crate::bindings::MESSAGE_KEY_{name} }}"
-        )?;
+        writeln!(file, "    unsafe {{ crate::bindings::MESSAGE_KEY_{name} }}")?;
         writeln!(file, "}}")?;
         writeln!(file)?;
     }
@@ -243,6 +240,5 @@ fn main() {
         .expect("Couldn't write bindings!");
 
     let keys = message_keys.keys.lock().unwrap().clone();
-    write_messages_rs(&out_path.join("messages.rs"), &keys)
-        .expect("Couldn't write messages!");
+    write_messages_rs(&out_path.join("messages.rs"), &keys).expect("Couldn't write messages!");
 }

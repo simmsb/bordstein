@@ -1,204 +1,135 @@
-use core::{cell::Cell, marker::PhantomPinned, pin::Pin, ptr::NonNull, task::Poll};
+use core::ptr::NonNull;
 
-use cordyceps::{Linked, List, list::Links};
-use embassy_sync::waitqueue::AtomicWaker;
-use pin_init::{PinInit, pin_data, pinned_drop};
+use cordyceps::List;
+use pin_init::PinInit;
 
 use crate::{
     bindings::{self, BatteryChargeState},
+    multi_registration_listener::{
+        Entry, Handle, MultiRegistrationListRoot, MultiRegistrationListener,
+        MultiRegistrationService, MultiRegistrationStreamListener, Stream, StreamHandler,
+    },
     single_core_cell::SingleCoreCell,
 };
-
-pub fn battery_service_peek_current_value() -> BatteryChargeState {
-    unsafe { bindings::battery_state_service_peek() }
-}
-
-struct BatteryServiceEntry {
-    links: Links<BatteryServiceEntry>,
-
-    callback: *mut BatteryServiceHandlerVTable,
-}
-
-unsafe impl Linked<Links<BatteryServiceEntry>> for BatteryServiceEntry {
-    type Handle = NonNull<BatteryServiceEntry>;
-
-    fn into_ptr(r: Self::Handle) -> core::ptr::NonNull<Self> {
-        r
-    }
-
-    unsafe fn from_ptr(ptr: core::ptr::NonNull<Self>) -> Self::Handle {
-        ptr
-    }
-
-    unsafe fn links(
-        ptr: core::ptr::NonNull<Self>,
-    ) -> core::ptr::NonNull<Links<BatteryServiceEntry>> {
-        let target = ptr.as_ptr();
-
-        unsafe {
-            let links = core::ptr::addr_of_mut!((*target).links);
-
-            NonNull::new_unchecked(links)
-        }
-    }
-}
 
 pub trait BatteryServiceHandler<'env> = FnMut(BatteryChargeState) + 'env;
 
 pub(crate) type BatteryServiceHandlerVTable = dyn BatteryServiceHandler<'static>;
 
-/// Represents an active subscription. When this is dropped the callback will be deregistered.
-#[must_use = "Callback is deregistered and dropped when [BatteryServiceHandle] is dropped"]
-#[pin_data(PinnedDrop)]
-pub struct BatteryServiceHandle<F> {
-    #[pin]
+pub struct BatteryService {
+    _private: (),
+}
+
+/// Access to the battery state service, use this to subscribe
+impl BatteryService {
+    /// Listen to battery events
+    ///
+    /// When the returned [Handle] is dropped, the callback will be
+    /// deregistered and the closure dropped.
+    ///
+    /// NOTE: You can create multiple battery event listeners from multiple locations,
+    /// the library handles this elegantly using an intrusive linked list of
+    /// stack-allocated nodes.
+    ///
+    /// This returns a [PinInit] as we need to pass the pebble SDK a pointer to the
+    /// closure passed in, if [Handle] could move, it would invalidate
+    /// this reference.
+    ///
+    /// Use [pin_init::stack_pin_init] to allocate the result of this method in your
+    /// stack frame.
+    pub fn listen<F>(callback: F) -> impl PinInit<Handle<'static, BatteryServiceListener<F>>>
+    where
+        F: FnMut(BatteryChargeState),
+    {
+        Handle::init(
+            BatteryServiceListener { callback },
+            (),
+            const { &BatteryService { _private: () } },
+        )
+    }
+
+    /// Similar to [Self::listen], this returns a [futures::Stream] of [BatteryChargeState].
+    ///
+    /// NOTE: You can create multiple battery event listeners from multiple locations,
+    /// the library handles this elegantly using an intrusive linked list of
+    /// stack-allocated nodes.
+    ///
+    /// This returns a [PinInit] as we need to pass the pebble SDK a pointer to the
+    /// closure passed in, if [Stream] could move, it would invalidate
+    /// this reference.
+    ///
+    /// Use [pin_init::stack_pin_init] to allocate the result of this method in your
+    /// stack frame.
+    pub fn stream()
+    -> impl PinInit<Stream<'static, BatteryServiceListener<StreamHandler<BatteryChargeState>>>>
+    {
+        Stream::init((), const { &BatteryService { _private: () } })
+    }
+}
+
+static LIST: SingleCoreCell<List<Entry<NonNull<BatteryServiceHandlerVTable>>>> =
+    SingleCoreCell::new(List::new());
+
+impl MultiRegistrationService for BatteryService {
+    type CallbackData = NonNull<BatteryServiceHandlerVTable>;
+
+    fn list(&self) -> &MultiRegistrationListRoot<Self::CallbackData> {
+        &LIST
+    }
+}
+
+pub struct BatteryServiceListener<F> {
     callback: F,
-
-    entry: BatteryServiceEntry,
-
-    #[pin]
-    _pin_phantom: PhantomPinned,
 }
 
-static LIST: SingleCoreCell<List<BatteryServiceEntry>> = SingleCoreCell::new(List::new());
+impl MultiRegistrationStreamListener for BatteryServiceListener<StreamHandler<BatteryChargeState>> {
+    type Value = BatteryChargeState;
 
-/// Listen to battery events
-///
-/// When the returned [BatteryServiceHandle] is dropped, the callback will be
-/// deregistered and the closure dropped.
-///
-/// NOTE: You can create multiple battery event listeners from multiple locations,
-/// the library handles this elegantly using an intrusive linked list of
-/// stack-allocated nodes.
-///
-/// This returns a [PinInit] as we need to pass the pebble SDK a pointer to the
-/// closure passed in, if [BatteryServiceHandle] could move, it would invalidate
-/// this reference.
-///
-/// Use [pin_init::stack_pin_init] to allocate the result of this method in your
-/// stack frame.
-#[must_use = "Callback is deregistered and dropped when [BatteryServiceHandle] is dropped"]
-pub fn listen<F>(callback: F) -> impl PinInit<BatteryServiceHandle<F>>
+    unsafe fn from_stream_handler(handler: StreamHandler<BatteryChargeState>) -> Self {
+        Self { callback: handler }
+    }
+}
+
+impl<'env, F> MultiRegistrationListener for BatteryServiceListener<F>
 where
-    F: FnMut(BatteryChargeState),
+    F: BatteryServiceHandler<'env>,
 {
-    pin_init::pin_init!(&this in BatteryServiceHandle {
-        callback,
+    type Service = BatteryService;
+    type Extra = ();
 
-        entry: BatteryServiceEntry {
-            links: Links::default(),
-            callback: unsafe { core::mem::transmute::<_, *mut BatteryServiceHandlerVTable>(&raw mut (*this.as_ptr()).callback as *mut dyn BatteryServiceHandler<'_>) },
-        },
-
-        _pin_phantom: PhantomPinned,
-    }).pin_chain(|p| {
-        let project = p.project();
-
+    unsafe fn extract(
+        self_: NonNull<Self>,
+        _extra: Self::Extra,
+    ) -> <Self::Service as MultiRegistrationService>::CallbackData {
         unsafe {
-            LIST.with_mut(|l| {
-                l.push_front(NonNull::from_mut(project.entry));
-
-                re_register_callback(l);
-            });
-        }
-
-        Ok(())
-    })
-}
-
-type BatteryServiceStreamHandler = impl FnMut(BatteryChargeState);
-
-#[pin_data]
-pub struct BatteryServiceStream {
-    #[pin]
-    handle: BatteryServiceHandle<BatteryServiceStreamHandler>,
-
-    waker: AtomicWaker,
-
-    value: Cell<Option<BatteryChargeState>>,
-}
-
-impl futures::Stream for BatteryServiceStream {
-    type Item = BatteryChargeState;
-
-    fn poll_next(
-        self: Pin<&mut Self>,
-        cx: &mut core::task::Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        let value = self.value.take();
-
-        if let Some(value) = value {
-            Poll::Ready(Some(value))
-        } else {
-            self.waker.register(cx.waker());
-            Poll::Pending
-        }
-    }
-}
-
-#[define_opaque(BatteryServiceStreamHandler)]
-fn stream_closure(ptr: NonNull<BatteryServiceStream>) -> BatteryServiceStreamHandler {
-    move |evt| unsafe {
-        let waker_ptr = &raw mut (*ptr.as_ptr()).waker;
-        let value_ptr = &raw mut (*ptr.as_ptr()).value;
-        (*value_ptr).set(Some(evt));
-        (*waker_ptr).wake();
-    }
-}
-
-/// Similar to [listen], this returns a [futures::Stream] of [BatteryChargeState].
-///
-/// NOTE: You can create multiple battery event listeners from multiple locations,
-/// the library handles this elegantly using an intrusive linked list of
-/// stack-allocated nodes.
-///
-/// This returns a [PinInit] as we need to pass the pebble SDK a pointer to the
-/// closure passed in, if [BatteryServiceStream] could move, it would invalidate
-/// this reference.
-///
-/// Use [pin_init::stack_pin_init] to allocate the result of this method in your
-/// stack frame.
-#[must_use = "Callback is deregistered and dropped when [BatteryServiceStream] is dropped"]
-pub fn stream() -> impl PinInit<BatteryServiceStream> {
-    pin_init::pin_init!(&this in BatteryServiceStream {
-        handle <- listen(stream_closure(this)),
-        waker: AtomicWaker::new(),
-        value: Cell::new(None),
-    })
-}
-
-unsafe fn re_register_callback(list: &mut List<BatteryServiceEntry>) {
-    if list.is_empty() {
-        unsafe {
-            bindings::battery_state_service_unsubscribe();
-
-            return;
+            let ptr = &raw mut (*self_.as_ptr()).callback as *mut dyn BatteryServiceHandler<'_>;
+            NonNull::new_unchecked(core::mem::transmute(ptr))
         }
     }
 
-    unsafe {
-        bindings::battery_state_service_subscribe(Some(battery_service_callback));
-    }
-}
-
-#[pinned_drop]
-impl<F> PinnedDrop for BatteryServiceHandle<F> {
-    fn drop(self: Pin<&mut Self>) {
+    fn reregister<'service>(
+        list: &'service MultiRegistrationListRoot<
+            <Self::Service as MultiRegistrationService>::CallbackData,
+        >,
+    ) {
         unsafe {
-            LIST.with_mut(|l| {
-                l.remove(NonNull::from_mut(self.project().entry));
+            list.with_mut(|list| {
+                if list.is_empty() {
+                    bindings::battery_state_service_unsubscribe();
 
-                re_register_callback(l);
+                    return;
+                }
+
+                bindings::battery_state_service_subscribe(Some(battery_service_callback));
             });
         }
     }
 }
-
 unsafe extern "C" fn battery_service_callback(event: BatteryChargeState) {
     unsafe {
         LIST.with_mut(|l| {
             for entry in l.iter_mut() {
-                (*entry.callback)(event);
+                (*entry.data.as_ptr())(event);
             }
         })
     };

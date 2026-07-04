@@ -1,15 +1,15 @@
-use core::{
-    marker::{PhantomData, PhantomPinned},
-    pin::Pin,
-    ptr::NonNull,
-};
+use core::{marker::PhantomData, ptr::NonNull};
 
-use cordyceps::{Linked, List, list::Links};
-use pin_init::{PinInit, pin_data, pinned_drop};
+use cordyceps::List;
+use pin_init::PinInit;
 
 use crate::{
     bindings::{self, AppMessageResult},
     dictionary::{DictionaryRef, DictionaryWriter},
+    multi_registration_listener::{
+        Entry, Handle, MultiRegistrationListRoot, MultiRegistrationListener,
+        MultiRegistrationService,
+    },
     single_core_cell::SingleCoreCell,
 };
 
@@ -18,29 +18,27 @@ use crate::{
 ///
 /// You receive an instance of this from [crate::main].
 pub struct AppMessages {
-    listeners: SingleCoreCell<List<AppMessageEntry>>,
+    _private: (),
 }
 
 impl AppMessages {
     #[doc(hidden)]
     pub unsafe fn steal() -> Self {
-        Self {
-            listeners: SingleCoreCell::new(List::new()),
-        }
+        Self { _private: () }
     }
 
     /// Open the app message service with the given buffer sizes.
     ///
-    /// Returns an [AppMessagesHandle] that can be used to send messages and
-    /// register event listeners via [AppMessagesHandle::listen].
+    /// Returns an [OpenAppMessages] that can be used to send messages and
+    /// register event listeners via [OpenAppMessages::listen].
     ///
-    /// When the returned [AppMessagesHandle] is dropped, the app message service
+    /// When the returned [OpenAppMessages] is dropped, the app message service
     /// is closed and SDK callbacks are deregistered.
     pub fn open<'handle>(
         &'handle mut self,
         size_inbound: u32,
         size_outbound: u32,
-    ) -> AppMessagesHandle<'handle> {
+    ) -> OpenAppMessages<'handle> {
         unsafe {
             bindings::app_message_set_context(self as *mut _ as *mut _);
 
@@ -52,54 +50,98 @@ impl AppMessages {
             bindings::app_message_open(size_inbound, size_outbound);
         }
 
-        AppMessagesHandle {
-            app_messages: NonNull::from(self),
+        OpenAppMessages {
             _phantom: PhantomData,
         }
     }
 }
 
-struct AppMessageEntry {
-    links: Links<AppMessageEntry>,
+static LIST: SingleCoreCell<List<Entry<AppMessagesPointers>>> = SingleCoreCell::new(List::new());
 
-    callback_inbox_received: *mut AppMessageInboxReceivedHandlerVTable,
-    callback_inbox_dropped: *mut AppMessageInboxDroppedHandlerVTable,
-    callback_outbox_sent: *mut AppMessageOutboxSentHandlerVTable,
-    callback_outbox_failed: *mut AppMessageOutboxFailedHandlerVTable,
-}
-
-unsafe impl Linked<Links<AppMessageEntry>> for AppMessageEntry {
-    type Handle = NonNull<AppMessageEntry>;
-
-    fn into_ptr(r: Self::Handle) -> core::ptr::NonNull<Self> {
-        r
-    }
-
-    unsafe fn from_ptr(ptr: core::ptr::NonNull<Self>) -> Self::Handle {
-        ptr
-    }
-
-    unsafe fn links(ptr: core::ptr::NonNull<Self>) -> core::ptr::NonNull<Links<AppMessageEntry>> {
-        let target = ptr.as_ptr();
-
-        unsafe {
-            let links = core::ptr::addr_of_mut!((*target).links);
-
-            NonNull::new_unchecked(links)
-        }
-    }
+pub struct AppMessagesPointers {
+    inbox_received: NonNull<AppMessageInboxReceivedHandlerVTable>,
+    inbox_dropped: NonNull<AppMessageInboxDroppedHandlerVTable>,
+    outbox_sent: NonNull<AppMessageOutboxSentHandlerVTable>,
+    outbox_failed: NonNull<AppMessageOutboxFailedHandlerVTable>,
 }
 
 pub type EmptyInboxDroppedHandler = impl AppMessageInboxDroppedHandler<'static>;
 pub type EmptyOutboxSentHandler = impl AppMessageOutboxSentHandler<'static>;
 pub type EmptyOutboxFailedHandler = impl AppMessageOutboxFailedHandler<'static>;
 
-pub struct AppMessagesHandle<'handle> {
-    app_messages: NonNull<AppMessages>,
+impl<'open> MultiRegistrationService for OpenAppMessages<'open> {
+    type CallbackData = AppMessagesPointers;
+
+    fn list(&self) -> &MultiRegistrationListRoot<Self::CallbackData> {
+        &LIST
+    }
+}
+
+pub struct AppMessageListener<'open, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed> {
+    inbox_received: FInboxReceived,
+    inbox_dropped: FInboxDropped,
+    outbox_sent: FOutboxSent,
+    outbox_failed: FOutboxFailed,
+
+    _phantom: PhantomData<&'open ()>,
+}
+
+impl<'env, 'open, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed>
+    MultiRegistrationListener
+    for AppMessageListener<'open, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed>
+where
+    FInboxReceived: AppMessageInboxReceivedHandler<'env>,
+    FInboxDropped: AppMessageInboxDroppedHandler<'env>,
+    FOutboxSent: AppMessageOutboxSentHandler<'env>,
+    FOutboxFailed: AppMessageOutboxFailedHandler<'env>,
+{
+    type Service = OpenAppMessages<'open>;
+
+    type Extra = ();
+
+    unsafe fn extract(
+        self_: NonNull<Self>,
+        _extra: Self::Extra,
+    ) -> <Self::Service as MultiRegistrationService>::CallbackData {
+        unsafe {
+            let inbox_received = NonNull::new_unchecked(core::mem::transmute(
+                &raw mut (*self_.as_ptr()).inbox_received
+                    as *mut dyn AppMessageInboxReceivedHandler<'_>,
+            ));
+            let inbox_dropped = NonNull::new_unchecked(core::mem::transmute(
+                &raw mut (*self_.as_ptr()).inbox_dropped
+                    as *mut dyn AppMessageInboxDroppedHandler<'_>,
+            ));
+            let outbox_sent = NonNull::new_unchecked(core::mem::transmute(
+                &raw mut (*self_.as_ptr()).outbox_sent as *mut dyn AppMessageOutboxSentHandler<'_>,
+            ));
+            let outbox_failed = NonNull::new_unchecked(core::mem::transmute(
+                &raw mut (*self_.as_ptr()).outbox_failed
+                    as *mut dyn AppMessageOutboxFailedHandler<'_>,
+            ));
+
+            AppMessagesPointers {
+                inbox_received,
+                inbox_dropped,
+                outbox_sent,
+                outbox_failed,
+            }
+        }
+    }
+
+    fn reregister<'service>(
+        _list: &'service MultiRegistrationListRoot<
+            <Self::Service as MultiRegistrationService>::CallbackData,
+        >,
+    ) {
+    }
+}
+
+pub struct OpenAppMessages<'handle> {
     _phantom: PhantomData<&'handle mut ()>,
 }
 
-impl<'handle> AppMessagesHandle<'handle> {
+impl<'open> OpenAppMessages<'open> {
     pub fn send(
         &self,
         f: impl for<'dictionary> FnOnce(
@@ -126,71 +168,41 @@ impl<'handle> AppMessagesHandle<'handle> {
     /// list of stack-allocated nodes.
     ///
     /// This returns a [PinInit] as we need to pass the pebble SDK a pointer to
-    /// the stack allocated closures passed in. If [AppMessageListenerHandle]
+    /// the stack allocated closures passed in. If [Handle]
     /// could move, it would invalidate this reference.
     ///
     /// Use [pin_init::stack_pin_init] to allocate the result of this method in
     /// your stack frame.
-    #[must_use = "Callbacks are deregistered and dropped when [AppMessageListenerHandle] is dropped."]
-    pub fn listen<'subscription, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed>(
+    pub fn listen<'env, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed>(
         &self,
         inbox_received: FInboxReceived,
         inbox_dropped: FInboxDropped,
         outbox_sent: FOutboxSent,
         outbox_failed: FOutboxFailed,
     ) -> impl PinInit<
-        AppMessageListenerHandle<
-            'subscription,
-            FInboxReceived,
-            FInboxDropped,
-            FOutboxSent,
-            FOutboxFailed,
+        Handle<
+            '_,
+            AppMessageListener<'open, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed>,
         >,
     >
     where
-        'subscription: 'handle,
-        FInboxReceived: for<'message> FnMut(DictionaryRef<'message>) + 'subscription,
-        FInboxDropped: FnMut(AppMessageResult) + 'subscription,
-        FOutboxSent: for<'message> FnMut(DictionaryRef<'message>) + 'subscription,
-        FOutboxFailed:
-            for<'message> FnMut(DictionaryRef<'message>, AppMessageResult) + 'subscription,
+        'env: 'open,
+        FInboxReceived: for<'message> FnMut(DictionaryRef<'message>) + 'env,
+        FInboxDropped: FnMut(AppMessageResult) + 'env,
+        FOutboxSent: for<'message> FnMut(DictionaryRef<'message>) + 'env,
+        FOutboxFailed: for<'message> FnMut(DictionaryRef<'message>, AppMessageResult) + 'env,
     {
-        let app_messages = self.app_messages;
-
-        pin_init::pin_init!{&this in AppMessageListenerHandle {
-            callback_inbox_received: inbox_received,
-            callback_inbox_dropped: inbox_dropped,
-            callback_outbox_sent: outbox_sent,
-            callback_outbox_failed: outbox_failed,
-
-            entry: AppMessageEntry {
-                links: Links::default(),
-                callback_inbox_received:
-                unsafe { core::mem::transmute::<_, *mut AppMessageInboxReceivedHandlerVTable>(&raw mut (*this.as_ptr()).callback_inbox_received as *mut dyn AppMessageInboxReceivedHandler<'_>) },
-                callback_inbox_dropped:
-                unsafe { core::mem::transmute::<_, *mut AppMessageInboxDroppedHandlerVTable>(&raw mut (*this.as_ptr()).callback_inbox_dropped as *mut dyn AppMessageInboxDroppedHandler<'_>) },
-                callback_outbox_sent:
-                unsafe { core::mem::transmute::<_, *mut AppMessageOutboxSentHandlerVTable>(&raw mut (*this.as_ptr()).callback_outbox_sent as *mut dyn AppMessageOutboxSentHandler<'_>) },
-                callback_outbox_failed:
-                unsafe { core::mem::transmute::<_, *mut AppMessageOutboxFailedHandlerVTable>(&raw mut (*this.as_ptr()).callback_outbox_failed as *mut dyn AppMessageOutboxFailedHandler<'_>) },
+        Handle::init(
+            AppMessageListener {
+                inbox_received,
+                inbox_dropped,
+                outbox_sent,
+                outbox_failed,
+                _phantom: PhantomData,
             },
-
-            app_messages,
-
-            _pin_phantom: PhantomPinned,
-            _phantom: PhantomData,
-        }}
-        .pin_chain(move |p| {
-            let project = p.project();
-
-            unsafe {
-                project.app_messages.as_ref().listeners.with_mut(|l| {
-                    l.push_front(NonNull::from_mut(project.entry));
-                });
-            }
-
-            Ok(())
-        })
+            (),
+            &self,
+        )
     }
 
     /// Register callbacks to listen on app message receive events.
@@ -202,27 +214,29 @@ impl<'handle> AppMessagesHandle<'handle> {
     /// list of stack-allocated nodes.
     ///
     /// This returns a [PinInit] as we need to pass the pebble SDK a pointer to
-    /// the stack allocated closures passed in. If [AppMessageListenerHandle]
+    /// the stack allocated closures passed in. If [Handle]
     /// could move, it would invalidate this reference.
     ///
     /// Use [pin_init::stack_pin_init] to allocate the result of this method in
     /// your stack frame.
-    #[must_use = "Callbacks are deregistered and dropped when [AppMessageListenerHandle] is dropped."]
-    pub fn listen_received<'subscription, FInboxReceived>(
+    pub fn listen_received<'env, FInboxReceived>(
         &self,
         inbox_received: FInboxReceived,
     ) -> impl PinInit<
-        AppMessageListenerHandle<
-            'subscription,
-            FInboxReceived,
-            EmptyInboxDroppedHandler,
-            EmptyOutboxSentHandler,
-            EmptyOutboxFailedHandler,
+        Handle<
+            '_,
+            AppMessageListener<
+                'open,
+                FInboxReceived,
+                EmptyInboxDroppedHandler,
+                EmptyOutboxSentHandler,
+                EmptyOutboxFailedHandler,
+            >,
         >,
     >
     where
-        'subscription: 'handle,
-        FInboxReceived: for<'message> FnMut(DictionaryRef<'message>) + 'subscription,
+        'env: 'open,
+        FInboxReceived: for<'message> FnMut(DictionaryRef<'message>) + 'env,
     {
         self.listen(
             inbox_received,
@@ -248,7 +262,7 @@ fn empty_outbox_failed_handler() -> EmptyOutboxFailedHandler {
     |_, _| {}
 }
 
-impl Drop for AppMessagesHandle<'_> {
+impl Drop for OpenAppMessages<'_> {
     fn drop(&mut self) {
         unsafe {
             bindings::app_message_deregister_callbacks();
@@ -274,39 +288,6 @@ pub(crate) type AppMessageInboxDroppedHandlerVTable = dyn AppMessageInboxDropped
 pub(crate) type AppMessageOutboxSentHandlerVTable = dyn AppMessageOutboxSentHandler<'static>;
 
 pub(crate) type AppMessageOutboxFailedHandlerVTable = dyn AppMessageOutboxFailedHandler<'static>;
-
-/// This struct represents that an AppMessage handler is registered.
-/// When dropped, the handler is deregistered.
-#[must_use = "Callbacks are deregistered and dropped when [AppMessageListenerHandle] is dropped."]
-#[pin_data(PinnedDrop)]
-pub struct AppMessageListenerHandle<
-    'handle,
-    FInboxReceived,
-    FInboxDropped,
-    FOutboxSent,
-    FOutboxFailed,
-> {
-    #[pin]
-    callback_inbox_received: FInboxReceived,
-
-    #[pin]
-    callback_inbox_dropped: FInboxDropped,
-
-    #[pin]
-    callback_outbox_sent: FOutboxSent,
-
-    #[pin]
-    callback_outbox_failed: FOutboxFailed,
-
-    entry: AppMessageEntry,
-
-    app_messages: NonNull<AppMessages>,
-
-    #[pin]
-    _pin_phantom: PhantomPinned,
-
-    _phantom: PhantomData<&'handle mut ()>,
-}
 
 #[derive(Clone, Copy, Debug)]
 pub enum AppMessageSendResult {
@@ -336,34 +317,18 @@ impl bindings::AppMessageResult {
     }
 }
 
-#[pinned_drop]
-impl<'handle, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed> PinnedDrop
-    for AppMessageListenerHandle<'handle, FInboxReceived, FInboxDropped, FOutboxSent, FOutboxFailed>
-{
-    fn drop(self: Pin<&mut Self>) {
-        let project = self.project();
-
-        unsafe {
-            project.app_messages.as_ref().listeners.with_mut(|l| {
-                l.remove(NonNull::from_mut(project.entry));
-            });
-        }
-    }
-}
-
 unsafe extern "C" fn received_callback(
     iterator: *mut bindings::DictionaryIterator,
-    context: *mut core::ffi::c_void,
+    _context: *mut core::ffi::c_void,
 ) {
     let root_dict = unsafe { *NonNull::new(iterator).unwrap().as_ptr() };
-    let app_messages = context as *mut AppMessages;
 
     unsafe {
-        (*app_messages).listeners.with_mut(|l| {
+        LIST.with_mut(|l| {
             for entry in l.iter_mut() {
                 let mut dict = root_dict.clone();
                 let dict_ref = crate::dictionary::DictionaryRef::new(NonNull::from_mut(&mut dict));
-                (*entry.callback_inbox_received)(dict_ref);
+                (*entry.data.inbox_received.as_ptr())(dict_ref);
             }
         });
     }
@@ -371,13 +336,11 @@ unsafe extern "C" fn received_callback(
     unsafe { crate::executor::poll_executor() };
 }
 
-unsafe extern "C" fn dropped_callback(reason: AppMessageResult, context: *mut core::ffi::c_void) {
-    let app_messages = context as *mut AppMessages;
-
+unsafe extern "C" fn dropped_callback(reason: AppMessageResult, _context: *mut core::ffi::c_void) {
     unsafe {
-        (*app_messages).listeners.with_mut(|l| {
+        LIST.with_mut(|l| {
             for entry in l.iter_mut() {
-                (*entry.callback_inbox_dropped)(reason);
+                (*entry.data.inbox_dropped.as_ptr())(reason);
             }
         });
     }
@@ -387,17 +350,16 @@ unsafe extern "C" fn dropped_callback(reason: AppMessageResult, context: *mut co
 
 unsafe extern "C" fn sent_callback(
     iterator: *mut bindings::DictionaryIterator,
-    context: *mut core::ffi::c_void,
+    _context: *mut core::ffi::c_void,
 ) {
     let root_dict = unsafe { *NonNull::new(iterator).unwrap().as_ptr() };
-    let app_messages = context as *mut AppMessages;
 
     unsafe {
-        (*app_messages).listeners.with_mut(|l| {
+        LIST.with_mut(|l| {
             for entry in l.iter_mut() {
                 let mut dict = root_dict.clone();
                 let dict_ref = crate::dictionary::DictionaryRef::new(NonNull::from_mut(&mut dict));
-                (*entry.callback_outbox_sent)(dict_ref);
+                (*entry.data.outbox_sent.as_ptr())(dict_ref);
             }
         });
     }
@@ -408,17 +370,16 @@ unsafe extern "C" fn sent_callback(
 unsafe extern "C" fn failed_callback(
     iterator: *mut bindings::DictionaryIterator,
     reason: AppMessageResult,
-    context: *mut core::ffi::c_void,
+    _context: *mut core::ffi::c_void,
 ) {
     let root_dict = unsafe { *NonNull::new(iterator).unwrap().as_ptr() };
-    let app_messages = context as *mut AppMessages;
 
     unsafe {
-        (*app_messages).listeners.with_mut(|l| {
+        LIST.with_mut(|l| {
             for entry in l.iter_mut() {
                 let mut dict = root_dict.clone();
                 let dict_ref = crate::dictionary::DictionaryRef::new(NonNull::from_mut(&mut dict));
-                (*entry.callback_outbox_failed)(dict_ref, reason);
+                (*entry.data.outbox_failed.as_ptr())(dict_ref, reason);
             }
         });
     }
