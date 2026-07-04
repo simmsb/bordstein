@@ -62,14 +62,14 @@ pub mod multi_registration_listener;
 /// Manage vibration motor
 pub mod vibes;
 
+/// Bitmaps
+pub mod bitmap;
+
 pub mod prelude {
     pub use crate::dictionary::*;
     pub use crate::events::{
-        accelerometer::AccelerometerService,
-        battery_state::BatteryService,
-        connection::ConnectionService,
-        health::HealthService,
-        tick::TickService,
+        accelerometer::AccelerometerService, battery_state::BatteryService,
+        connection::ConnectionService, health::HealthService, tick::TickService,
         unobstructed_area::UnobstructedAreaService,
     };
     pub use crate::font::Font;

@@ -2,10 +2,12 @@ use core::ptr::NonNull;
 
 use crate::bindings;
 
+pub type ResourceId = u32;
+
 pub struct Resource(pub(crate) NonNull<core::ffi::c_void>);
 
 impl Resource {
-    pub fn get_handle(resource_id: u32) -> Option<Self> {
+    pub fn get_handle(resource_id: ResourceId) -> Option<Self> {
         let ptr = unsafe { bindings::resource_get_handle(resource_id) };
         NonNull::new(ptr).map(Resource)
     }

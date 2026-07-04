@@ -8,7 +8,7 @@ use crate::{
 };
 
 pub struct WindowHandle<'active> {
-    inner: NonNull<bindings::Window>,
+    pub(crate) inner: NonNull<bindings::Window>,
     _phantom: PhantomData<&'active ()>,
 }
 
