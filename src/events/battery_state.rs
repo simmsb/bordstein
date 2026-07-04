@@ -65,6 +65,10 @@ impl BatteryService {
     {
         Stream::init((), const { &BatteryService { _private: () } })
     }
+
+    pub fn peek_current_value() -> BatteryChargeState {
+        unsafe { bindings::battery_state_service_peek() }
+    }
 }
 
 static LIST: SingleCoreCell<List<Entry<NonNull<BatteryServiceHandlerVTable>>>> =

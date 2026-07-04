@@ -21,14 +21,6 @@ pub fn health_service_sum(
     unsafe { bindings::health_service_sum(metric, start.0, end.0) }
 }
 
-pub fn health_service_today(metric: bindings::HealthMetric) -> bindings::HealthValue {
-    unsafe { bindings::health_service_sum_today(metric) }
-}
-
-pub fn health_service_peek_current_value(metric: bindings::HealthMetric) -> bindings::HealthValue {
-    unsafe { bindings::health_service_peek_current_value(metric) }
-}
-
 pub trait HealthServiceHandler<'env> = FnMut(HealthEventType) + 'env;
 
 pub(crate) type HealthServiceHandlerVTable = dyn HealthServiceHandler<'static>;
@@ -80,6 +72,14 @@ impl HealthService {
     pub fn stream()
     -> impl PinInit<Stream<'static, HealthServiceListener<StreamHandler<HealthEventType>>>> {
         Stream::init((), const { &HealthService { _private: () } })
+    }
+
+    pub fn today(metric: bindings::HealthMetric) -> bindings::HealthValue {
+        unsafe { bindings::health_service_sum_today(metric) }
+    }
+
+    pub fn peek_current_value(metric: bindings::HealthMetric) -> bindings::HealthValue {
+        unsafe { bindings::health_service_peek_current_value(metric) }
     }
 }
 

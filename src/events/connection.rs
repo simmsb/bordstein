@@ -12,10 +12,6 @@ use crate::{
     single_core_cell::SingleCoreCell,
 };
 
-pub fn peek_pebble_app_connection() -> bool {
-    unsafe { bindings::connection_service_peek_pebble_app_connection() }
-}
-
 pub trait ConnectionServiceHandler<'env> = FnMut(bool) + 'env;
 
 pub(crate) type ConnectionServiceHandlerVTable = dyn ConnectionServiceHandler<'static>;
@@ -67,6 +63,10 @@ impl ConnectionService {
     pub fn stream() -> impl PinInit<Stream<'static, ConnectionServiceListener<StreamHandler<bool>>>>
     {
         Stream::init((), const { &ConnectionService { _private: () } })
+    }
+
+    pub fn peek_pebble_app_connection() -> bool {
+        unsafe { bindings::connection_service_peek_pebble_app_connection() }
     }
 }
 
