@@ -2,6 +2,10 @@
 
 <h2 align="center">Rust API bindings for the Pebble SDK which tries its best to be rusty</h2>
 
+<p align="center">
+  <a href="https://simmsb.github.io/bordstein/bordstein/index.html"><img alt="Docs" src="https://img.shields.io/badge/Documentation-green"></a>
+</p>
+
 > [!WARNING]
 > This library is heavily in development, might not be fully safe, and will
 > probably change often. Use at your own risk.

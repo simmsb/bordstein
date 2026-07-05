@@ -1,0 +1,76 @@
+name: Build and Deploy Rust Docs
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy-docs:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@v35
+
+      - name: Cache Nix & Devenv Shell
+        uses: nix-community/cache-nix-action@v7
+        with:
+            token: ${{ secrets.GITHUB_TOKEN }}
+            primary-key: nix-${{ runner.os }}-${{ hashFiles('devenv.*') }}
+            restore-prefixes-first-match: nix-${{ runner.os }}-
+            gc-max-store-size-linux: 3G
+            purge: true
+            purge-prefixes: nix-${{ runner.os }}-
+            purge-created: 0
+            purge-last-accessed: 0
+            purge-primary-key: never
+
+      - name: Cache Pebble SDK
+        id: pebble-sdk-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.XDG_DATA_HOME }}/pebble-sdk
+          key: ${{ runner.os }}-pebble-sdk
+
+      - name: Install devenv
+        run: nix profile add nixpkgs#devenv
+
+      - name: Install SDK
+        run: |
+          devenv shell pebble sdk install latest
+
+      - name: Build Rust Documentation
+        run: |
+          devenv shell pebble build
+          devenv shell cargo doc -Zunstable-options -Zrustdoc-scrape-examples --no-deps --workspace
+
+          touch target/thumbv7m-none-eabi/doc/.nojekyll
+
+          echo '<meta http-equiv="refresh" content="0;url=bordstein/index.html">' > target/thumbv7m-none-eabi/doc/index.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: target/thumbv7m-none-eabi/doc
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
