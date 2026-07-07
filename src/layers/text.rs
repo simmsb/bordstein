@@ -26,8 +26,11 @@ impl<'layer> TextLayer<'layer> {
         }
     }
 
-    /// Set contents of this text layer. The layer doesn't copy the text so the
-    /// lifetime of the text must be greater than or equal to the layer.
+    /// Set contents of this text layer.
+    ///
+    /// This method returns a guard which replaces the text when dropped, this
+    /// ensures that the string reference lives and is unmutated while it is
+    /// being used by the text layer.
     #[must_use = "Content is set back to an empty string when the returned guard is dropped"]
     pub fn set_text<'text, 'a>(&'a mut self, text: &'text CStr) -> SetTextGuard<'text, 'a> {
         unsafe {
@@ -41,12 +44,11 @@ impl<'layer> TextLayer<'layer> {
     }
 
     /// View the text of the text layer.
-    ///
-    /// Note, this assumes that the text isn't being updated through SDK functions while the borrow is active.
-    pub fn get_text<'text>(&'text self) -> Option<&'text CStr> {
+    pub fn get_text<T>(&self, f: impl for<'text> FnMut(&'text CStr) -> T) -> Option<T> {
         let ptr = unsafe { bindings::text_layer_get_text(self.inner.as_ptr()) };
+        let cstr = unsafe { NonNull::new(ptr.cast_mut()).map(|p| CStr::from_ptr(p.as_ptr())) };
 
-        unsafe { NonNull::new(ptr.cast_mut()).map(|p| CStr::from_ptr(p.as_ptr())) }
+        cstr.map(f)
     }
 
     pub fn set_background_colour(&mut self, colour: GColor) {
