@@ -181,6 +181,8 @@ fn write_messages_rs(path: &Path, keys: &[String]) -> std::io::Result<()> {
 fn main() {
     println!("cargo:rerun-if-env-changed=PEBBLE_INCLUDE_DIRS");
     println!("cargo:rerun-if-env-changed=PEBBLE_CFLAGS");
+    println!("cargo:rerun-if-env-changed=PEBBLE_EMULATOR");
+    println!("cargo:rerun-if-env-changed=PEBBLE_BUILD_DIR");
 
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("none") {
         return;
@@ -195,11 +197,14 @@ fn main() {
                    #include <pebble.h>
                   ";
         let emulator = env::var("PEBBLE_EMULATOR").unwrap();
+        let Ok(build_dir) = env::var("PEBBLE_BUILD_DIR") else {
+            panic!("Bordstein requires a PEBBLE_BUILD_DIR environment variable set to point to your project's `build/` directory when building without PEBBLE_INCLUDE_DIRS set");
+        };
         let pebble_include_path = get_pebble_include_path(&emulator).unwrap();
         println!("cargo:rerun-if-changed={}", pebble_include_path.display());
         clang_args.push(format!("-isystem{}", pebble_include_path.display()));
-        clang_args.push("-Ibuild/include/".to_string());
-        clang_args.push(format!("-Ibuild/{emulator}"));
+        clang_args.push(format!("-I{build_dir}/include/"));
+        clang_args.push(format!("-I{build_dir}/{emulator}"));
     }
     clang_args.extend(sdk_includes());
     clang_args.extend(pebble_cflags());
