@@ -28,7 +28,7 @@
       "emery"
     ],
     "watchapp": {
-      "watchface": true
+      "watchface": false
     },
     "messageKeys": [
       "WEATHER_REQUEST",

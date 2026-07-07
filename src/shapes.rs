@@ -211,6 +211,20 @@ impl GPoint {
     pub const fn with_size(self, size: GSize) -> GRect {
         GRect { origin: self, size }
     }
+
+    pub fn min(self, other: GPoint) -> GPoint {
+        Self {
+            x: self.x.min(other.x),
+            y: self.y.min(other.y),
+        }
+    }
+
+    pub fn max(self, other: GPoint) -> GPoint {
+        Self {
+            x: self.x.max(other.x),
+            y: self.y.max(other.y),
+        }
+    }
 }
 
 impl GSize {
@@ -220,5 +234,20 @@ impl GSize {
 
     pub const fn with_origin(self, origin: GPoint) -> GRect {
         GRect { origin, size: self }
+    }
+
+    pub fn total_bounds_of_rects(rects: impl IntoIterator<Item = GRect>) -> GSize {
+        let mut point_min = GPoint::new(0, 0);
+        let mut point_max = GPoint::new(0, 0);
+
+        for r in rects {
+            point_min = point_min.min(r.origin);
+            point_max = point_max.max(r.origin.offset(r.size));
+        }
+
+        GSize::new(
+            point_max.x.abs_diff(point_min.x).cast_signed(),
+            point_max.y.abs_diff(point_min.y).cast_signed(),
+        )
     }
 }

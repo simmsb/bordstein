@@ -28,6 +28,8 @@
 
     PEBBLE_EMULATOR = "emery";
 
+    PEBBLE_BUILD_DIR = "${config.devenv.root}/build";
+
     # needed on darwin, might need an equivalent on linux?
     # needed so that @rpath/libLLVM.dylib resolves
     # DYLD_FALLBACK_LIBRARY_PATH="${config.languages.rust.toolchainPackage}/lib";

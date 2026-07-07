@@ -6,9 +6,7 @@ use heapless::CString;
 use pin_init::stack_pin_init;
 
 use bordstein::{
-    bindings::{GColor8, GTextAlignment, TimeUnits},
-    prelude::*,
-    shapes,
+    bindings::{GColor8, GPoint, GSize, GTextAlignment, TimeUnits}, layers::ScrollLayer, prelude::*, shapes,
 };
 
 bordstein::main!(async_main);
@@ -71,8 +69,6 @@ async fn async_main_(mut services: bordstein::PebbleServices, _spawner: embassy_
             bordstein::info!("minute timer tick: {:?}", time);
         }));
 
-        let mut foo = 123;
-
         {
             stack_pin_init!(let timer_seconds = TickService::listen(TimeUnits::SECOND_UNIT, |time, _| {
                 bordstein::info!("second timer tick: {:?}", time);
@@ -84,15 +80,11 @@ async fn async_main_(mut services: bordstein::PebbleServices, _spawner: embassy_
             let remaining_space =
                 window_bounds.shrink_to_avoid(status_bar.layer().bounds(), shapes::Edge::Top, 0);
 
-            stack_pin_init! {
-                let child_layer = root_layer
-                    .new_child::<Layer>(remaining_space)
-                    .unwrap()
-                    .with_update_proc(|_layer, _ctx| {
-                        bordstein::debug!("Hello from layer callback: {}", foo);
-                        foo += 1;
-                    })
-            };
+            let mut child_layer = root_layer
+                .new_child::<ScrollLayer>(remaining_space)
+                .unwrap();
+
+            child_layer.set_click_config_onto_window(&mut h);
 
             let mut num_taps: u32 = 0;
 
@@ -102,29 +94,61 @@ async fn async_main_(mut services: bordstein::PebbleServices, _spawner: embassy_
                 bordstein::info!("Tap! {}, {:?}, {}", num_taps, axis, dir);
             }));
 
-            let mut text_layer: TextLayer<'_> = child_layer
-                .new_child::<TextLayer>(child_layer.bounds())
+            let mut text_layer = child_layer
+                .new_child::<TextLayer>(child_layer.layer().bounds().with_height(100))
                 .unwrap();
             text_layer.set_text_alignment(GTextAlignment::GTextAlignmentCenter);
 
+            let mut fill_layer = child_layer
+                .new_child::<TextLayer>(child_layer.layer().bounds().translate(0, text_layer.layer().bounds().size.h))
+                .unwrap();
+
+            child_layer.set_content_size(GSize::total_bounds_of_rects([
+                text_layer.layer().frame(),
+                fill_layer.layer().frame(),
+            ]));
+            // child_layer.set_content_size(GSize::new(200, 500));
+
+            bordstein::info!("Scroll bounds: {:?}", child_layer.get_content_size());
+
+            let _guard = fill_layer.set_text(cr#"
+foo
+bar
+baz
+hello
+this
+is
+some
+text
+lorem
+ipsum
+dolor
+sit
+amet
+"#);
+
             let mut text_content: CString<64>;
-            for i in 0..10 {
+            for i in 0..100 {
                 text_content = CString::<64>::new();
                 let _ = ufmt::uwrite!(&mut text_content, "{}", i);
                 let _guard = text_layer.set_text(&text_content);
 
                 embassy_time::Timer::after_secs(1).await;
 
-                app_messages
-                    .send(|d| {
-                        d.u16(10001, 1234)?;
+                // app_messages
+                //     .send(|d| {
+                //         d.u16(10001, 1234)?;
 
-                        Ok(())
-                    })
-                    .unwrap();
+                //         Ok(())
+                //     })
+                //     .unwrap();
+
+                child_layer.set_content_offset(GPoint::new(0, i * -10), true);
+
+                bordstein::info!("Scroll offset: {:?}", child_layer.get_content_offset());
             }
 
-            bordstein::info!("Child bounds: {:?}", child_layer.bounds());
+            bordstein::info!("Child bounds: {:?}", child_layer.layer().bounds());
         }
 
         stack_pin_init!(let timer_seconds_stream = TickService::stream(TimeUnits::SECOND_UNIT));

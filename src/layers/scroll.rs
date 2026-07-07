@@ -43,7 +43,7 @@ impl<'layer> ScrollLayer<'layer> {
         Some(child)
     }
 
-    pub fn set_click_config_onto_window(&mut self, window: &WindowHandle) {
+    pub fn set_click_config_onto_window(&mut self, window: &mut WindowHandle) {
         unsafe {
             bindings::scroll_layer_set_click_config_onto_window(
                 self.inner.as_ptr(),
@@ -75,6 +75,14 @@ impl<'layer> ScrollLayer<'layer> {
     pub fn set_frame(&mut self, frame: GRect) {
         unsafe {
             bindings::scroll_layer_set_frame(self.inner.as_ptr(), frame);
+        }
+    }
+}
+
+impl<'a> Drop for ScrollLayer<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            bindings::scroll_layer_destroy(self.inner.as_ptr());
         }
     }
 }
