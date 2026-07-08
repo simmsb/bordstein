@@ -65,6 +65,9 @@ pub mod vibes;
 /// Bitmaps
 pub mod bitmap;
 
+/// App glance
+pub mod glance;
+
 pub mod prelude {
     pub use crate::dictionary::*;
     pub use crate::events::{

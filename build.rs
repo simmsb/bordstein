@@ -198,7 +198,9 @@ fn main() {
                   ";
         let emulator = env::var("PEBBLE_EMULATOR").unwrap();
         let Ok(build_dir) = env::var("PEBBLE_BUILD_DIR") else {
-            panic!("Bordstein requires a PEBBLE_BUILD_DIR environment variable set to point to your project's `build/` directory when building without PEBBLE_INCLUDE_DIRS set");
+            panic!(
+                "Bordstein requires a PEBBLE_BUILD_DIR environment variable set to point to your project's `build/` directory when building without PEBBLE_INCLUDE_DIRS set"
+            );
         };
         let pebble_include_path = get_pebble_include_path(&emulator).unwrap();
         println!("cargo:rerun-if-changed={}", pebble_include_path.display());

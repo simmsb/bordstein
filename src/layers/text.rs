@@ -44,7 +44,7 @@ impl<'layer> TextLayer<'layer> {
     }
 
     /// View the text of the text layer.
-    pub fn get_text<T>(&self, f: impl for<'text> FnMut(&'text CStr) -> T) -> Option<T> {
+    pub fn get_text<T>(&self, f: impl for<'text> FnOnce(&'text CStr) -> T) -> Option<T> {
         let ptr = unsafe { bindings::text_layer_get_text(self.inner.as_ptr()) };
         let cstr = unsafe { NonNull::new(ptr.cast_mut()).map(|p| CStr::from_ptr(p.as_ptr())) };
 

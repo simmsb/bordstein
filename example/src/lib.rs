@@ -6,7 +6,10 @@ use heapless::CString;
 use pin_init::stack_pin_init;
 
 use bordstein::{
-    bindings::{GColor8, GPoint, GSize, GTextAlignment, TimeUnits}, layers::ScrollLayer, prelude::*, shapes,
+    bindings::{GColor8, GPoint, GSize, GTextAlignment, TimeUnits},
+    layers::ScrollLayer,
+    prelude::*,
+    shapes,
 };
 
 bordstein::main!(async_main);
