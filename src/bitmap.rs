@@ -60,6 +60,26 @@ impl<'a> GBitmap<'a> {
         };
         NonNull::new(ptr).map(GBitmap::from_ptr)
     }
+
+    pub fn bytes_per_row(&self) -> u16 {
+        unsafe {
+            bindings::gbitmap_get_bytes_per_row(self.inner.as_ptr())
+        }
+    }
+
+    pub fn format(&self) -> bindings::GBitmapFormat {
+        unsafe {
+            bindings::gbitmap_get_format(self.inner.as_ptr())
+        }
+    }
+
+    // TODO: wrapper which depends on the framebuffer format to allow for setting pixels
+    // pub fn data(&mut self) -> u16 {
+    //     unsafe {
+    //         bindings::gbitmap_get_bytes_per_row(self.inner.as_ptr())
+    //     }
+    // }
+
 }
 
 impl<'a> Drop for GBitmap<'a> {

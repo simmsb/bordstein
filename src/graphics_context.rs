@@ -1,10 +1,11 @@
-use core::{ffi::CStr, marker::PhantomData, ptr::NonNull};
+use core::{ffi::CStr, marker::PhantomData, mem::ManuallyDrop, ptr::NonNull};
 
 use crate::{
     bindings::{
         self, GCompOp, GCornerMask, GPoint, GRect, GSize, GTextAlignment, GTextAttributes,
         GTextOverflowMode,
     },
+    bitmap::GBitmap,
     colour::GColor,
     font::Font,
 };
@@ -98,6 +99,47 @@ impl<'a> GContext<'a> {
     pub fn fill_circle(&mut self, center: GPoint, radius: u16) {
         unsafe {
             bindings::graphics_fill_circle(self.inner.as_ptr(), center, radius);
+        }
+    }
+
+    pub fn capture_frame_buffer(&mut self) -> Option<CapturedFramebuffer<'_>> {
+        unsafe {
+            let bitmap_ptr = bindings::graphics_capture_frame_buffer(self.inner.as_ptr());
+            let bitmap = GBitmap::from_ptr(NonNull::new(bitmap_ptr)?);
+
+            Some(CapturedFramebuffer {
+                inner: ManuallyDrop::new(bitmap),
+                ctx: self.inner,
+            })
+        }
+    }
+
+    pub fn capture_frame_buffer_format(
+        &mut self,
+        format: bindings::GBitmapFormat,
+    ) -> Option<CapturedFramebuffer<'_>> {
+        unsafe {
+            let bitmap_ptr =
+                bindings::graphics_capture_frame_buffer_format(self.inner.as_ptr(), format);
+            let bitmap = GBitmap::from_ptr(NonNull::new(bitmap_ptr)?);
+
+            Some(CapturedFramebuffer {
+                inner: ManuallyDrop::new(bitmap),
+                ctx: self.inner,
+            })
+        }
+    }
+}
+
+pub struct CapturedFramebuffer<'capture> {
+    inner: ManuallyDrop<GBitmap<'capture>>,
+    ctx: NonNull<bindings::GContext>,
+}
+
+impl<'capture> Drop for CapturedFramebuffer<'capture> {
+    fn drop(&mut self) {
+        unsafe {
+            bindings::graphics_release_frame_buffer(self.ctx.as_ptr(), self.inner.inner.as_ptr());
         }
     }
 }
